@@ -14,6 +14,10 @@ let entries = [];
 let deferredPrompt = null;
 let currentEditId = null;
 let expandedEntryIds = new Set();
+let supabase = null;
+let currentUser = null;
+let authReady = false;
+let isSyncing = false;
 
 const navButtons = document.querySelectorAll(".nav-btn");
 const sections = document.querySelectorAll(".page-section");
@@ -72,6 +76,14 @@ const toolMarginOutput = document.getElementById("toolMarginOutput");
 const goNewEntryBtn = document.getElementById("goNewEntryBtn");
 const goHistoryBtn = document.getElementById("goHistoryBtn");
 
+let authEmailInput = null;
+let authPasswordInput = null;
+let authStatusText = null;
+let authLoginBtn = null;
+let authSignupBtn = null;
+let authLogoutBtn = null;
+let authSyncBtn = null;
+
 function formatCurrency(value) {
   return `€${Number(value || 0).toFixed(2)}`;
 }
@@ -115,9 +127,21 @@ function loadEntries() {
   }
 
   entries = loaded || [];
+  saveEntries();
+}
 
-  // save everything back to the stable key
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+function sortEntriesByDateDesc(list) {
+  return [...list].sort((a, b) => {
+    const dateA = new Date(a.matchDate || 0).getTime();
+    const dateB = new Date(b.matchDate || 0).getTime();
+
+    if (dateB !== dateA) return dateB - dateA;
+
+    const updatedA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const updatedB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+
+    return updatedB - updatedA;
+  });
 }
 
 function calculateMargin(marketType, o1, ox, o2) {
@@ -131,6 +155,73 @@ function calculateMargin(marketType, o1, ox, o2) {
 
 function getSportLabel(value) {
   return value === "football" ? "Ποδόσφαιρο" : "Μπάσκετ";
+}
+
+function createAuthUI() {
+  const topbar = document.querySelector(".topbar");
+  if (!topbar) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "panel premium-card";
+  wrapper.style.marginBottom = "18px";
+  wrapper.innerHTML = `
+    <div class="panel-head" style="margin-bottom:12px;">
+      <div>
+        <span class="panel-kicker">Cloud Sync</span>
+        <h3 style="margin:0;">Supabase Sync</h3>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end;">
+      <div class="field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" />
+      </div>
+
+      <div class="field">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="Password" />
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" id="authLoginBtn" class="primary-btn">Login</button>
+        <button type="button" id="authSignupBtn" class="secondary-btn">Sign Up</button>
+        <button type="button" id="authLogoutBtn" class="secondary-btn">Logout</button>
+        <button type="button" id="authSyncBtn" class="secondary-btn">Sync Now</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;color:var(--muted);" id="authStatusText">
+      Local mode. Συνδέσου για sync σε κινητό και PC.
+    </div>
+  `;
+
+  topbar.parentNode.insertBefore(wrapper, topbar);
+
+  authEmailInput = document.getElementById("authEmail");
+  authPasswordInput = document.getElementById("authPassword");
+  authStatusText = document.getElementById("authStatusText");
+  authLoginBtn = document.getElementById("authLoginBtn");
+  authSignupBtn = document.getElementById("authSignupBtn");
+  authLogoutBtn = document.getElementById("authLogoutBtn");
+  authSyncBtn = document.getElementById("authSyncBtn");
+}
+
+function setAuthStatus(message) {
+  if (authStatusText) authStatusText.textContent = message;
+}
+
+function updateAuthUI() {
+  if (!authReady) {
+    setAuthStatus("Supabase config δεν φορτώθηκε σωστά.");
+    return;
+  }
+
+  if (currentUser) {
+    setAuthStatus(`Logged in as ${currentUser.email || "user"}. Το ιστορικό συγχρονίζεται στο cloud.`);
+  } else {
+    setAuthStatus("Local mode. Συνδέσου για sync σε κινητό και PC.");
+  }
 }
 
 function createBookmakerCards() {
@@ -423,7 +514,7 @@ function renderRecentEntries() {
   }
 
   recentEntries.className = "recent-list";
-  const recent = [...entries].slice(-5).reverse();
+  const recent = sortEntriesByDateDesc(entries).slice(0, 5);
 
   recentEntries.innerHTML = recent.map(item => `
     <div class="recent-item">
@@ -440,27 +531,16 @@ function getFilteredEntries() {
   const selectedMarket = filterMarket.value;
   const query = searchMatch.value.trim().toLowerCase();
 
-  return entries
-    .filter(item => {
-      const sportMatch = selectedSport === "all" || item.sport === selectedSport;
-      const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
-      const textMatch =
-        !query ||
-        item.matchName.toLowerCase().includes(query) ||
-        (item.notes || "").toLowerCase().includes(query);
+  return sortEntriesByDateDesc(entries).filter(item => {
+    const sportMatch = selectedSport === "all" || item.sport === selectedSport;
+    const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
+    const textMatch =
+      !query ||
+      item.matchName.toLowerCase().includes(query) ||
+      (item.notes || "").toLowerCase().includes(query);
 
-      return sportMatch && marketMatch && textMatch;
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.matchDate).getTime();
-      const dateB = new Date(b.matchDate).getTime();
-
-      if (dateB !== dateA) {
-        return dateB - dateA; // πιο πρόσφατη ημερομηνία πρώτη
-      }
-
-      return 0;
-    });
+    return sportMatch && marketMatch && textMatch;
+  });
 }
 
 function toggleExpandEntry(id) {
@@ -533,41 +613,41 @@ function renderHistory() {
   let html = "";
 
   filtered.forEach(item => {
-      const isExpanded = expandedEntryIds.has(item.id);
+    const isExpanded = expandedEntryIds.has(item.id);
 
-      html += `
-        <tr>
-          <td>${item.matchDate}</td>
-          <td>${getSportLabel(item.sport)}</td>
-          <td>
-            <strong>${item.matchName}</strong>
-            ${item.notes ? `<div class="muted">${item.notes}</div>` : ""}
-          </td>
-          <td>${item.market}</td>
-          <td>${item.usedBookmakersCount}</td>
-          <td>${formatCurrency(item.totalStake)}</td>
-          <td>${formatPercent(item.weightedMargin)}</td>
-          <td class="${item.pl1 > 0 ? "positive" : item.pl1 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl1)}</td>
-          <td>${item.market === "1X2"
-            ? `<span class="${item.plX > 0 ? "positive" : item.plX < 0 ? "negative" : "neutral"}">${formatCurrency(item.plX)}</span>`
-            : "-"
-          }</td>
-          <td class="${item.pl2 > 0 ? "positive" : item.pl2 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl2)}</td>
-          <td class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</td>
-          <td>
-            <div class="row-actions">
-              <button class="small-btn" onclick="toggleExpandEntry('${item.id}')">${isExpanded ? "Hide" : "Details"}</button>
-              <button class="small-btn" onclick="editEntry('${item.id}')">Edit</button>
-              <button class="small-btn delete" onclick="deleteEntry('${item.id}')">Delete</button>
-            </div>
-          </td>
-        </tr>
-      `;
+    html += `
+      <tr>
+        <td>${item.matchDate}</td>
+        <td>${getSportLabel(item.sport)}</td>
+        <td>
+          <strong>${item.matchName}</strong>
+          ${item.notes ? `<div class="muted">${item.notes}</div>` : ""}
+        </td>
+        <td>${item.market}</td>
+        <td>${item.usedBookmakersCount}</td>
+        <td>${formatCurrency(item.totalStake)}</td>
+        <td>${formatPercent(item.weightedMargin)}</td>
+        <td class="${item.pl1 > 0 ? "positive" : item.pl1 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl1)}</td>
+        <td>${item.market === "1X2"
+          ? `<span class="${item.plX > 0 ? "positive" : item.plX < 0 ? "negative" : "neutral"}">${formatCurrency(item.plX)}</span>`
+          : "-"
+        }</td>
+        <td class="${item.pl2 > 0 ? "positive" : item.pl2 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl2)}</td>
+        <td class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="small-btn" onclick="toggleExpandEntry('${item.id}')">${isExpanded ? "Hide" : "Details"}</button>
+            <button class="small-btn" onclick="editEntry('${item.id}')">Edit</button>
+            <button class="small-btn delete" onclick="deleteEntry('${item.id}')">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `;
 
-      if (isExpanded) {
-        html += getBookmakerDetailHtml(item);
-      }
-    });
+    if (isExpanded) {
+      html += getBookmakerDetailHtml(item);
+    }
+  });
 
   historyTableBody.innerHTML = html;
 }
@@ -581,6 +661,7 @@ function renderAll() {
 function buildEntryFromForm() {
   const bookmakers = getAllBookmakersFromForm();
   const aggregate = computeAggregate(bookmakers, market.value, result.value);
+  const nowIso = new Date().toISOString();
 
   return {
     id: currentEditId || crypto.randomUUID(),
@@ -601,11 +682,264 @@ function buildEntryFromForm() {
     plX: market.value === "1X2" ? aggregate.plX : 0,
     pl2: aggregate.pl2,
     actualReturn: aggregate.actualReturn,
-    actualPL: aggregate.actualPL
+    actualPL: aggregate.actualPL,
+    updatedAt: nowIso,
+    createdAt: nowIso
   };
 }
 
-function addOrUpdateEntry(event) {
+function mergeEntries(remoteEntries, localEntries) {
+  const map = new Map();
+
+  remoteEntries.forEach((item) => {
+    map.set(item.id, item);
+  });
+
+  localEntries.forEach((item) => {
+    if (!map.has(item.id)) {
+      map.set(item.id, item);
+    }
+  });
+
+  return sortEntriesByDateDesc(Array.from(map.values()));
+}
+
+function entryToDbRow(entry, userId) {
+  return {
+    id: entry.id,
+    user_id: userId,
+    match_date: entry.matchDate,
+    sport: entry.sport,
+    market: entry.market,
+    match_name: entry.matchName,
+    result: entry.result || null,
+    notes: entry.notes || null,
+    payload: entry,
+    total_stake: entry.totalStake || 0,
+    weighted_margin: entry.weightedMargin || 0,
+    actual_return: entry.actualReturn || 0,
+    actual_pl: entry.actualPL || 0,
+    used_bookmakers_count: entry.usedBookmakersCount || 0
+  };
+}
+
+function dbRowToEntry(row) {
+  const payload = row.payload || {};
+  return {
+    ...payload,
+    id: row.id,
+    matchDate: row.match_date,
+    sport: row.sport,
+    market: row.market,
+    matchName: row.match_name,
+    result: row.result || "",
+    notes: row.notes || "",
+    totalStake: Number(row.total_stake || payload.totalStake || 0),
+    weightedMargin: Number(row.weighted_margin || payload.weightedMargin || 0),
+    actualReturn: Number(row.actual_return || payload.actualReturn || 0),
+    actualPL: Number(row.actual_pl || payload.actualPL || 0),
+    usedBookmakersCount: Number(row.used_bookmakers_count || payload.usedBookmakersCount || 0),
+    createdAt: row.created_at || payload.createdAt || "",
+    updatedAt: row.updated_at || payload.updatedAt || ""
+  };
+}
+
+async function initSupabase() {
+  try {
+    if (!window.supabase || !window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
+      setAuthStatus("Supabase config δεν βρέθηκε. Το app τρέχει local only.");
+      return;
+    }
+
+    supabase = window.supabase.createClient(
+      window.SUPABASE_URL,
+      window.SUPABASE_ANON_KEY
+    );
+
+    authReady = true;
+
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error(error);
+      setAuthStatus("Αποτυχία φόρτωσης auth session.");
+      return;
+    }
+
+    currentUser = data.session?.user || null;
+    updateAuthUI();
+
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      currentUser = session?.user || null;
+      updateAuthUI();
+
+      if (currentUser) {
+        await syncFromCloud();
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    setAuthStatus("Αποτυχία αρχικοποίησης Supabase.");
+  }
+}
+
+async function signUpWithEmail() {
+  if (!supabase) return alert("Supabase not ready.");
+  const email = authEmailInput?.value.trim();
+  const password = authPasswordInput?.value.trim();
+
+  if (!email || !password) {
+    alert("Βάλε email και password.");
+    return;
+  }
+
+  setAuthStatus("Creating account...");
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    alert(error.message);
+    updateAuthUI();
+    return;
+  }
+
+  setAuthStatus("Το account δημιουργήθηκε. Αν έχει email confirmation ενεργό, επιβεβαίωσέ το και μετά κάνε login.");
+}
+
+async function loginWithEmail() {
+  if (!supabase) return alert("Supabase not ready.");
+  const email = authEmailInput?.value.trim();
+  const password = authPasswordInput?.value.trim();
+
+  if (!email || !password) {
+    alert("Βάλε email και password.");
+    return;
+  }
+
+  setAuthStatus("Logging in...");
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    alert(error.message);
+    updateAuthUI();
+    return;
+  }
+
+  setAuthStatus("Login successful. Syncing...");
+  await syncFromCloud();
+}
+
+async function logoutUser() {
+  if (!supabase) return;
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    alert(error.message);
+    return;
+  }
+  currentUser = null;
+  updateAuthUI();
+}
+
+async function pushAllLocalEntriesToCloud() {
+  if (!supabase || !currentUser) return;
+
+  const rows = entries.map((entry) => entryToDbRow(entry, currentUser.id));
+
+  if (!rows.length) return;
+
+  const { error } = await supabase
+    .from("bet_entries")
+    .upsert(rows, { onConflict: "id" });
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+async function fetchCloudEntries() {
+  if (!supabase || !currentUser) return [];
+
+  const { data, error } = await supabase
+    .from("bet_entries")
+    .select("*")
+    .order("match_date", { ascending: false })
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+
+  return (data || []).map(dbRowToEntry);
+}
+
+async function syncFromCloud() {
+  if (!supabase || !currentUser || isSyncing) return;
+
+  try {
+    isSyncing = true;
+    setAuthStatus("Syncing with cloud...");
+
+    const remoteEntries = await fetchCloudEntries();
+    const merged = mergeEntries(remoteEntries, entries);
+
+    entries = merged;
+    saveEntries();
+    renderAll();
+
+    await pushAllLocalEntriesToCloud();
+
+    const freshRemote = await fetchCloudEntries();
+    entries = sortEntriesByDateDesc(freshRemote);
+    saveEntries();
+    renderAll();
+
+    setAuthStatus(`Synced successfully. Logged in as ${currentUser.email || "user"}.`);
+  } catch (err) {
+    console.error(err);
+    setAuthStatus("Cloud sync failed. Το local ιστορικό παραμένει ασφαλές στη συσκευή.");
+  } finally {
+    isSyncing = false;
+  }
+}
+
+async function saveEntryToCloud(entry) {
+  if (!supabase || !currentUser) return;
+
+  const row = entryToDbRow(entry, currentUser.id);
+
+  const { error } = await supabase
+    .from("bet_entries")
+    .upsert(row, { onConflict: "id" });
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+async function deleteEntryFromCloud(id) {
+  if (!supabase || !currentUser) return;
+
+  const { error } = await supabase
+    .from("bet_entries")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+async function addOrUpdateEntry(event) {
   event.preventDefault();
 
   if (!matchName.value.trim()) {
@@ -621,19 +955,35 @@ function addOrUpdateEntry(event) {
   }
 
   if (currentEditId) {
+    const existing = entries.find((item) => item.id === currentEditId);
+    if (existing?.createdAt && !candidate.createdAt) {
+      candidate.createdAt = existing.createdAt;
+    }
+
     entries = entries.map((item) => item.id === currentEditId ? candidate : item);
     expandedEntryIds.add(candidate.id);
   } else {
     entries.push(candidate);
   }
 
+  entries = sortEntriesByDateDesc(entries);
   saveEntries();
   renderAll();
+
+  try {
+    if (currentUser) {
+      await saveEntryToCloud(candidate);
+      await syncFromCloud();
+    }
+  } catch {
+    alert("Η καταχώριση σώθηκε τοπικά, αλλά απέτυχε το cloud sync.");
+  }
+
   resetForm();
   switchSection("history");
 }
 
-function deleteEntry(id) {
+async function deleteEntry(id) {
   const confirmed = confirm("Να διαγραφεί αυτή η καταχώριση;");
   if (!confirmed) return;
 
@@ -642,8 +992,18 @@ function deleteEntry(id) {
   if (currentEditId === id) {
     resetForm();
   }
+
   saveEntries();
   renderAll();
+
+  try {
+    if (currentUser) {
+      await deleteEntryFromCloud(id);
+      await syncFromCloud();
+    }
+  } catch {
+    alert("Η διαγραφή έγινε τοπικά, αλλά απέτυχε το cloud sync.");
+  }
 }
 
 window.deleteEntry = deleteEntry;
@@ -736,15 +1096,36 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
-function clearAllEntries() {
+async function clearAllEntries() {
   const confirmed = confirm("Σίγουρα θέλεις να διαγράψεις όλες τις καταχωρίσεις;");
   if (!confirmed) return;
+
+  const ids = entries.map((item) => item.id);
 
   entries = [];
   expandedEntryIds.clear();
   resetForm();
   saveEntries();
   renderAll();
+
+  if (!currentUser || !supabase || !ids.length) return;
+
+  try {
+    const { error } = await supabase
+      .from("bet_entries")
+      .delete()
+      .in("id", ids);
+
+    if (error) {
+      console.error(error);
+      alert("Το local clear έγινε, αλλά το cloud clear απέτυχε.");
+      return;
+    }
+
+    await syncFromCloud();
+  } catch {
+    alert("Το local clear έγινε, αλλά το cloud clear απέτυχε.");
+  }
 }
 
 function switchSection(sectionId) {
@@ -841,38 +1222,48 @@ installBtn.addEventListener("click", async () => {
 });
 
 if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
-  window.addEventListener("load", async () => {
-    try {
-      const registration = await navigator.serviceWorker.register("./sw.js");
-
-      registration.addEventListener("updatefound", () => {
-        const newWorker = registration.installing;
-        if (!newWorker) return;
-
-        newWorker.addEventListener("statechange", () => {
-          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-            window.location.reload();
-          }
-        });
-      });
-
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        window.location.reload();
-      });
-    } catch (err) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => {
       console.error("Service Worker registration failed:", err);
-    }
+    });
   });
 }
 
+function initAuthActions() {
+  if (authLoginBtn) {
+    authLoginBtn.addEventListener("click", loginWithEmail);
+  }
 
-function init() {
+  if (authSignupBtn) {
+    authSignupBtn.addEventListener("click", signUpWithEmail);
+  }
+
+  if (authLogoutBtn) {
+    authLogoutBtn.addEventListener("click", logoutUser);
+  }
+
+  if (authSyncBtn) {
+    authSyncBtn.addEventListener("click", async () => {
+      if (!currentUser) {
+        alert("Κάνε login πρώτα.");
+        return;
+      }
+      await syncFromCloud();
+    });
+  }
+}
+
+async function init() {
+  createAuthUI();
   createBookmakerCards();
   bindDynamicBookmakerInputs();
   loadEntries();
   resetForm();
   updateToolCalculator();
   renderAll();
+  initAuthActions();
+  await initSupabase();
+  updateAuthUI();
 }
 
 init();
