@@ -225,6 +225,8 @@ function updateAuthUI() {
 }
 
 function createBookmakerCards() {
+  if (!bookmakersGrid) return;
+
   bookmakersGrid.innerHTML = BOOKMAKERS.map((name, index) => `
     <div class="bookmaker-card premium-card" data-bookmaker="${name}">
       <div class="bookmaker-card-head">
@@ -309,10 +311,13 @@ function computeBookmakerMetrics(bookmaker, marketType) {
 }
 
 function getAllBookmakersFromForm() {
+  if (!market) return [];
   return BOOKMAKERS.map((_, index) => computeBookmakerMetrics(getBookmakerFormValues(index), market.value));
 }
 
 function updateBookmakerCardVisuals() {
+  if (!market) return;
+
   const marketType = market.value;
   const is1X2 = marketType === "1X2";
 
@@ -324,7 +329,7 @@ function updateBookmakerCardVisuals() {
     el.style.display = is1X2 ? "block" : "none";
   });
 
-  if (!is1X2 && result.value === "X") {
+  if (!is1X2 && result && result.value === "X") {
     result.value = "";
   }
 
@@ -389,10 +394,12 @@ function setValueClass(el, value) {
 }
 
 function updatePreview() {
+  if (!previewStake) return;
+
   updateBookmakerCardVisuals();
 
   const bookmakers = getAllBookmakersFromForm();
-  const aggregate = computeAggregate(bookmakers, market.value, result.value);
+  const aggregate = computeAggregate(bookmakers, market?.value || "1X2", result?.value || "");
 
   previewStake.textContent = formatCurrency(aggregate.totalStake);
   previewMargin.textContent = formatPercent(aggregate.weightedMargin);
@@ -428,36 +435,36 @@ function resetBookmakerInputs() {
 
 function enterCreateMode() {
   currentEditId = null;
-  entryFormTitle.textContent = "Νέα Καταχώριση Αγώνα";
-  submitEntryBtn.textContent = "Αποθήκευση";
-  editBanner.classList.add("hidden");
+  if (entryFormTitle) entryFormTitle.textContent = "Νέα Καταχώριση Αγώνα";
+  if (submitEntryBtn) submitEntryBtn.textContent = "Αποθήκευση";
+  if (editBanner) editBanner.classList.add("hidden");
 }
 
 function enterEditMode() {
-  entryFormTitle.textContent = "Επεξεργασία Καταχώρισης";
-  submitEntryBtn.textContent = "Update Entry";
-  editBanner.classList.remove("hidden");
+  if (entryFormTitle) entryFormTitle.textContent = "Επεξεργασία Καταχώρισης";
+  if (submitEntryBtn) submitEntryBtn.textContent = "Update Entry";
+  if (editBanner) editBanner.classList.remove("hidden");
 }
 
 function resetForm() {
-  betForm.reset();
-  matchDate.value = new Date().toISOString().split("T")[0];
-  sport.value = "football";
-  market.value = "1X2";
-  result.value = "";
-  notes.value = "";
+  if (betForm) betForm.reset();
+  if (matchDate) matchDate.value = new Date().toISOString().split("T")[0];
+  if (sport) sport.value = "football";
+  if (market) market.value = "1X2";
+  if (result) result.value = "";
+  if (notes) notes.value = "";
   resetBookmakerInputs();
   enterCreateMode();
   updatePreview();
 }
 
 function populateFormFromEntry(entry) {
-  matchDate.value = entry.matchDate || "";
-  sport.value = entry.sport || "football";
-  market.value = entry.market || "1X2";
-  matchName.value = entry.matchName || "";
-  result.value = entry.result || "";
-  notes.value = entry.notes || "";
+  if (matchDate) matchDate.value = entry.matchDate || "";
+  if (sport) sport.value = entry.sport || "football";
+  if (market) market.value = entry.market || "1X2";
+  if (matchName) matchName.value = entry.matchName || "";
+  if (result) result.value = entry.result || "";
+  if (notes) notes.value = entry.notes || "";
 
   resetBookmakerInputs();
 
@@ -486,6 +493,8 @@ function populateFormFromEntry(entry) {
 }
 
 function renderStats() {
+  if (!totalMatches) return;
+
   const totalEntries = entries.length;
   const sumStake = entries.reduce((acc, item) => acc + Number(item.totalStake || 0), 0);
   const sumReturn = entries.reduce((acc, item) => acc + Number(item.actualReturn || 0), 0);
@@ -507,6 +516,8 @@ function renderStats() {
 }
 
 function renderRecentEntries() {
+  if (!recentEntries) return;
+
   if (!entries.length) {
     recentEntries.className = "recent-list empty-state";
     recentEntries.textContent = "Δεν υπάρχουν ακόμα καταχωρίσεις.";
@@ -527,9 +538,9 @@ function renderRecentEntries() {
 }
 
 function getFilteredEntries() {
-  const selectedSport = filterSport.value;
-  const selectedMarket = filterMarket.value;
-  const query = searchMatch.value.trim().toLowerCase();
+  const selectedSport = filterSport?.value || "all";
+  const selectedMarket = filterMarket?.value || "all";
+  const query = searchMatch?.value.trim().toLowerCase() || "";
 
   return sortEntriesByDateDesc(entries).filter(item => {
     const sportMatch = selectedSport === "all" || item.sport === selectedSport;
@@ -599,6 +610,8 @@ function getBookmakerDetailHtml(item) {
 }
 
 function renderHistory() {
+  if (!historyTableBody) return;
+
   const filtered = getFilteredEntries();
 
   if (!filtered.length) {
@@ -660,17 +673,23 @@ function renderAll() {
 
 function buildEntryFromForm() {
   const bookmakers = getAllBookmakersFromForm();
-  const aggregate = computeAggregate(bookmakers, market.value, result.value);
+  const aggregate = computeAggregate(bookmakers, market?.value || "1X2", result?.value || "");
   const nowIso = new Date().toISOString();
+
+  let createdAt = nowIso;
+  if (currentEditId) {
+    const existing = entries.find((item) => item.id === currentEditId);
+    createdAt = existing?.createdAt || nowIso;
+  }
 
   return {
     id: currentEditId || crypto.randomUUID(),
-    matchDate: matchDate.value,
-    sport: sport.value,
-    market: market.value,
-    matchName: matchName.value.trim(),
-    result: result.value,
-    notes: notes.value.trim(),
+    matchDate: matchDate?.value || "",
+    sport: sport?.value || "football",
+    market: market?.value || "1X2",
+    matchName: matchName?.value.trim() || "",
+    result: result?.value || "",
+    notes: notes?.value.trim() || "",
     bookmakers,
     usedBookmakersCount: aggregate.usedBookmakersCount,
     totalStake: aggregate.totalStake,
@@ -679,12 +698,12 @@ function buildEntryFromForm() {
     totalReturn2: aggregate.totalReturn2,
     weightedMargin: aggregate.weightedMargin,
     pl1: aggregate.pl1,
-    plX: market.value === "1X2" ? aggregate.plX : 0,
+    plX: (market?.value || "1X2") === "1X2" ? aggregate.plX : 0,
     pl2: aggregate.pl2,
     actualReturn: aggregate.actualReturn,
     actualPL: aggregate.actualPL,
     updatedAt: nowIso,
-    createdAt: nowIso
+    createdAt
   };
 }
 
@@ -696,7 +715,17 @@ function mergeEntries(remoteEntries, localEntries) {
   });
 
   localEntries.forEach((item) => {
-    if (!map.has(item.id)) {
+    const existing = map.get(item.id);
+
+    if (!existing) {
+      map.set(item.id, item);
+      return;
+    }
+
+    const existingUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+    const localUpdated = new Date(item.updatedAt || item.createdAt || 0).getTime();
+
+    if (localUpdated > existingUpdated) {
       map.set(item.id, item);
     }
   });
@@ -783,7 +812,11 @@ async function initSupabase() {
 }
 
 async function signUpWithEmail() {
-  if (!supabase) return alert("Supabase not ready.");
+  if (!supabaseClient) {
+    alert("Supabase not ready.");
+    return;
+  }
+
   const email = authEmailInput?.value.trim();
   const password = authPasswordInput?.value.trim();
 
@@ -809,7 +842,11 @@ async function signUpWithEmail() {
 }
 
 async function loginWithEmail() {
-  if (!supabase) return alert("Supabase not ready.");
+  if (!supabaseClient) {
+    alert("Supabase not ready.");
+    return;
+  }
+
   const email = authEmailInput?.value.trim();
   const password = authPasswordInput?.value.trim();
 
@@ -837,23 +874,25 @@ async function loginWithEmail() {
 
 async function logoutUser() {
   if (!supabaseClient) return;
+
   const { error } = await supabaseClient.auth.signOut();
   if (error) {
     alert(error.message);
     return;
   }
+
   currentUser = null;
   updateAuthUI();
 }
 
 async function pushAllLocalEntriesToCloud() {
-  if (!supabase || !currentUser) return;
+  if (!supabaseClient || !currentUser) return;
 
   const rows = entries.map((entry) => entryToDbRow(entry, currentUser.id));
 
   if (!rows.length) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("bet_entries")
     .upsert(rows, { onConflict: "id" });
 
@@ -864,11 +903,12 @@ async function pushAllLocalEntriesToCloud() {
 }
 
 async function fetchCloudEntries() {
-  if (!supabase || !currentUser) return [];
+  if (!supabaseClient || !currentUser) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("bet_entries")
     .select("*")
+    .eq("user_id", currentUser.id)
     .order("match_date", { ascending: false })
     .order("updated_at", { ascending: false });
 
@@ -881,7 +921,7 @@ async function fetchCloudEntries() {
 }
 
 async function syncFromCloud() {
-  if (!supabase || !currentUser || isSyncing) return;
+  if (!supabaseClient || !currentUser || isSyncing) return;
 
   try {
     isSyncing = true;
@@ -911,11 +951,11 @@ async function syncFromCloud() {
 }
 
 async function saveEntryToCloud(entry) {
-  if (!supabase || !currentUser) return;
+  if (!supabaseClient || !currentUser) return;
 
   const row = entryToDbRow(entry, currentUser.id);
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("bet_entries")
     .upsert(row, { onConflict: "id" });
 
@@ -926,12 +966,13 @@ async function saveEntryToCloud(entry) {
 }
 
 async function deleteEntryFromCloud(id) {
-  if (!supabase || !currentUser) return;
+  if (!supabaseClient || !currentUser) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("bet_entries")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", currentUser.id);
 
   if (error) {
     console.error(error);
@@ -942,7 +983,7 @@ async function deleteEntryFromCloud(id) {
 async function addOrUpdateEntry(event) {
   event.preventDefault();
 
-  if (!matchName.value.trim()) {
+  if (!matchName?.value.trim()) {
     alert("Συμπλήρωσε όνομα αγώνα.");
     return;
   }
@@ -955,11 +996,6 @@ async function addOrUpdateEntry(event) {
   }
 
   if (currentEditId) {
-    const existing = entries.find((item) => item.id === currentEditId);
-    if (existing?.createdAt && !candidate.createdAt) {
-      candidate.createdAt = existing.createdAt;
-    }
-
     entries = entries.map((item) => item.id === currentEditId ? candidate : item);
     expandedEntryIds.add(candidate.id);
   } else {
@@ -989,6 +1025,7 @@ async function deleteEntry(id) {
 
   entries = entries.filter(item => item.id !== id);
   expandedEntryIds.delete(id);
+
   if (currentEditId === id) {
     resetForm();
   }
@@ -1048,7 +1085,7 @@ function exportCSV() {
   const rows = [];
 
   entries.forEach(entry => {
-    entry.bookmakers.forEach(bm => {
+    (entry.bookmakers || []).forEach(bm => {
       if (bm.totalStake > 0 || bm.odd1 > 0 || bm.oddX > 0 || bm.odd2 > 0) {
         rows.push([
           entry.matchDate,
@@ -1108,12 +1145,13 @@ async function clearAllEntries() {
   saveEntries();
   renderAll();
 
-  if (!currentUser || !supabase || !ids.length) return;
+  if (!currentUser || !supabaseClient || !ids.length) return;
 
   try {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("bet_entries")
       .delete()
+      .eq("user_id", currentUser.id)
       .in("id", ids);
 
     if (error) {
@@ -1144,14 +1182,18 @@ function switchSection(sectionId) {
     tools: "Εργαλεία"
   };
 
-  pageTitle.textContent = titles[sectionId] || "Bet Tracker";
+  if (pageTitle) {
+    pageTitle.textContent = titles[sectionId] || "Bet Tracker";
+  }
 }
 
 function updateToolCalculator() {
+  if (!calcMarket || !toolMarginOutput) return;
+
   const marketType = calcMarket.value;
-  const o1 = parseNum(calcOdd1.value);
-  const ox = parseNum(calcOddX.value);
-  const o2 = parseNum(calcOdd2.value);
+  const o1 = parseNum(calcOdd1?.value);
+  const ox = parseNum(calcOddX?.value);
+  const o2 = parseNum(calcOdd2?.value);
 
   const margin = calculateMargin(marketType, o1, ox, o2);
   toolMarginOutput.textContent = formatPercent(margin);
@@ -1160,12 +1202,13 @@ function updateToolCalculator() {
     el.style.display = marketType === "1X2" ? "flex" : "none";
   });
 
-  if (marketType !== "1X2") {
+  if (marketType !== "1X2" && calcOddX) {
     calcOddX.value = "";
   }
 }
 
 function bindDynamicBookmakerInputs() {
+  if (!bookmakersGrid) return;
   bookmakersGrid.addEventListener("input", updatePreview);
   bookmakersGrid.addEventListener("change", updatePreview);
 }
@@ -1238,18 +1281,18 @@ if (goHistoryBtn) {
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  installBtn.classList.remove("hidden");
+  if (installBtn) installBtn.classList.remove("hidden");
 });
 
-installBtn.addEventListener("click", async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-  installBtn.classList.add("hidden");
-});
-
-
+if (installBtn) {
+  installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.classList.add("hidden");
+  });
+}
 
 function initAuthActions() {
   if (authLoginBtn) {
