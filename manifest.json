@@ -1,0 +1,10 @@
+{
+    "name": "Bet Margin Tracker",
+    "short_name": "BetTracker",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#081120",
+    "theme_color": "#0f172a",
+    "description": "Tracker για αποδόσεις, stakes, γκανιότα και profit/loss.",
+    "icons": []
+  }
