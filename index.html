@@ -72,19 +72,53 @@
 
     <main class="main-content">
       <header class="topbar">
-        <div class="topbar-left">
-          <div class="eyebrow">Bet Analytics Suite</div>
-          <h2 id="pageTitle">Dashboard</h2>
-          <p class="muted">
-            Παρακολούθηση αποδόσεων, πονταρισμάτων, bookmaker margin και καθαρού αποτελέσματος
-          </p>
-        </div>
+  <div class="topbar-left">
+    <div class="eyebrow">Bet Analytics Suite</div>
+    <h2 id="pageTitle">Dashboard</h2>
+    <p class="muted">
+      Παρακολούθηση αποδόσεων, πονταρισμάτων, bookmaker margin και καθαρού αποτελέσματος
+    </p>
+  </div>
 
-        <div class="topbar-actions">
-          <button id="installBtn" class="secondary-btn hidden">Install App</button>
-          <button id="exportCsvBtn" class="primary-btn glow-btn">Export CSV</button>
-        </div>
-      </header>
+  <div class="topbar-actions">
+    <button id="authToggleBtn" class="secondary-btn" type="button">Cloud Sync</button>
+    <button id="installBtn" class="secondary-btn hidden">Install App</button>
+    <button id="exportCsvBtn" class="primary-btn glow-btn">Export CSV</button>
+  </div>
+</header>
+
+<div id="authPanel" class="auth-panel hidden">
+  <div class="auth-panel-head">
+    <div>
+      <span class="panel-kicker">Cloud Sync</span>
+      <h3>Supabase Sync</h3>
+    </div>
+    <button id="authCloseBtn" type="button" class="small-btn">Close</button>
+  </div>
+
+  <div class="auth-panel-grid">
+    <div class="field">
+      <label for="authEmail">Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" />
+    </div>
+
+    <div class="field">
+      <label for="authPassword">Password</label>
+      <input type="password" id="authPassword" placeholder="Password" />
+    </div>
+  </div>
+
+  <div class="auth-panel-actions">
+    <button type="button" id="authLoginBtn" class="primary-btn">Login</button>
+    <button type="button" id="authSignupBtn" class="secondary-btn">Sign Up</button>
+    <button type="button" id="authLogoutBtn" class="secondary-btn">Logout</button>
+    <button type="button" id="authSyncBtn" class="secondary-btn">Sync Now</button>
+  </div>
+
+  <div id="authStatusText" class="auth-status-text">
+    Local mode. Συνδέσου για sync σε κινητό και PC.
+  </div>
+</div>
 
       <section id="dashboard" class="page-section active">
         <div class="hero-panel">

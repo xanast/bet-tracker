@@ -76,13 +76,16 @@ const toolMarginOutput = document.getElementById("toolMarginOutput");
 const goNewEntryBtn = document.getElementById("goNewEntryBtn");
 const goHistoryBtn = document.getElementById("goHistoryBtn");
 
-let authEmailInput = null;
-let authPasswordInput = null;
-let authStatusText = null;
-let authLoginBtn = null;
-let authSignupBtn = null;
-let authLogoutBtn = null;
-let authSyncBtn = null;
+const authPanel = document.getElementById("authPanel");
+const authToggleBtn = document.getElementById("authToggleBtn");
+const authCloseBtn = document.getElementById("authCloseBtn");
+const authEmailInput = document.getElementById("authEmail");
+const authPasswordInput = document.getElementById("authPassword");
+const authStatusText = document.getElementById("authStatusText");
+const authLoginBtn = document.getElementById("authLoginBtn");
+const authSignupBtn = document.getElementById("authSignupBtn");
+const authLogoutBtn = document.getElementById("authLogoutBtn");
+const authSyncBtn = document.getElementById("authSyncBtn");
 
 function formatCurrency(value) {
   return `€${Number(value || 0).toFixed(2)}`;
@@ -157,56 +160,6 @@ function getSportLabel(value) {
   return value === "football" ? "Ποδόσφαιρο" : "Μπάσκετ";
 }
 
-function createAuthUI() {
-  const topbar = document.querySelector(".topbar");
-  if (!topbar) return;
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "panel premium-card";
-  wrapper.style.marginBottom = "18px";
-  wrapper.innerHTML = `
-    <div class="panel-head" style="margin-bottom:12px;">
-      <div>
-        <span class="panel-kicker">Cloud Sync</span>
-        <h3 style="margin:0;">Supabase Sync</h3>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end;">
-      <div class="field">
-        <label for="authEmail">Email</label>
-        <input type="email" id="authEmail" placeholder="you@example.com" />
-      </div>
-
-      <div class="field">
-        <label for="authPassword">Password</label>
-        <input type="password" id="authPassword" placeholder="Password" />
-      </div>
-
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button type="button" id="authLoginBtn" class="primary-btn">Login</button>
-        <button type="button" id="authSignupBtn" class="secondary-btn">Sign Up</button>
-        <button type="button" id="authLogoutBtn" class="secondary-btn">Logout</button>
-        <button type="button" id="authSyncBtn" class="secondary-btn">Sync Now</button>
-      </div>
-    </div>
-
-    <div style="margin-top:12px;color:var(--muted);" id="authStatusText">
-      Local mode. Συνδέσου για sync σε κινητό και PC.
-    </div>
-  `;
-
-  topbar.parentNode.insertBefore(wrapper, topbar);
-
-  authEmailInput = document.getElementById("authEmail");
-  authPasswordInput = document.getElementById("authPassword");
-  authStatusText = document.getElementById("authStatusText");
-  authLoginBtn = document.getElementById("authLoginBtn");
-  authSignupBtn = document.getElementById("authSignupBtn");
-  authLogoutBtn = document.getElementById("authLogoutBtn");
-  authSyncBtn = document.getElementById("authSyncBtn");
-}
-
 function setAuthStatus(message) {
   if (authStatusText) authStatusText.textContent = message;
 }
@@ -221,6 +174,21 @@ function updateAuthUI() {
     setAuthStatus(`Logged in as ${currentUser.email || "user"}. Το ιστορικό συγχρονίζεται στο cloud.`);
   } else {
     setAuthStatus("Local mode. Συνδέσου για sync σε κινητό και PC.");
+  }
+}
+
+function toggleAuthPanel(forceOpen = null) {
+  if (!authPanel) return;
+
+  const shouldOpen =
+    forceOpen === null
+      ? authPanel.classList.contains("hidden")
+      : forceOpen;
+
+  authPanel.classList.toggle("hidden", !shouldOpen);
+
+  if (authToggleBtn) {
+    authToggleBtn.textContent = shouldOpen ? "Close Sync" : "Cloud Sync";
   }
 }
 
@@ -870,6 +838,7 @@ async function loginWithEmail() {
 
   setAuthStatus("Login successful. Syncing...");
   await syncFromCloud();
+  toggleAuthPanel(false);
 }
 
 async function logoutUser() {
@@ -1278,6 +1247,18 @@ if (goHistoryBtn) {
   });
 }
 
+if (authToggleBtn) {
+  authToggleBtn.addEventListener("click", () => {
+    toggleAuthPanel();
+  });
+}
+
+if (authCloseBtn) {
+  authCloseBtn.addEventListener("click", () => {
+    toggleAuthPanel(false);
+  });
+}
+
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredPrompt = e;
@@ -1320,7 +1301,6 @@ function initAuthActions() {
 
 async function init() {
   try {
-    createAuthUI();
     createBookmakerCards();
     bindDynamicBookmakerInputs();
     loadEntries();
