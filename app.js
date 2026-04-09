@@ -1,4 +1,4 @@
-const STORAGE_KEY = "bet_tracker_entries_v3";
+const STORAGE_KEY = "bet_tracker_entries";
 
 const BOOKMAKERS = [
   "Stoiximan",
@@ -90,16 +90,34 @@ function saveEntries() {
 }
 
 function loadEntries() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    entries = [];
-    return;
+  const possibleKeys = [
+    "bet_tracker_entries",
+    "bet_tracker_entries_v3",
+    "bet_tracker_entries_v2",
+    "bet_tracker_entries_v1"
+  ];
+
+  let loaded = null;
+
+  for (const key of possibleKeys) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        loaded = parsed;
+        break;
+      }
+    } catch {
+      // ignore invalid old storage
+    }
   }
-  try {
-    entries = JSON.parse(raw);
-  } catch {
-    entries = [];
-  }
+
+  entries = loaded || [];
+
+  // save everything back to the stable key
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }
 
 function calculateMargin(marketType, o1, ox, o2) {
