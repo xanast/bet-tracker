@@ -1170,27 +1170,55 @@ function bindDynamicBookmakerInputs() {
   bookmakersGrid.addEventListener("change", updatePreview);
 }
 
-navButtons.forEach(btn => {
+navButtons.forEach((btn) => {
+  if (!btn) return;
   btn.addEventListener("click", () => {
     switchSection(btn.dataset.section);
   });
 });
 
-market.addEventListener("change", updatePreview);
-result.addEventListener("change", updatePreview);
+if (market) {
+  market.addEventListener("change", updatePreview);
+}
 
-betForm.addEventListener("submit", addOrUpdateEntry);
-resetFormBtn.addEventListener("click", resetForm);
-cancelEditBtn.addEventListener("click", resetForm);
+if (result) {
+  result.addEventListener("change", updatePreview);
+}
 
-filterSport.addEventListener("change", renderHistory);
-filterMarket.addEventListener("change", renderHistory);
-searchMatch.addEventListener("input", renderHistory);
+if (betForm) {
+  betForm.addEventListener("submit", addOrUpdateEntry);
+}
 
-exportCsvBtn.addEventListener("click", exportCSV);
-clearAllBtn.addEventListener("click", clearAllEntries);
+if (resetFormBtn) {
+  resetFormBtn.addEventListener("click", resetForm);
+}
 
-[calcMarket, calcOdd1, calcOddX, calcOdd2].forEach(el => {
+if (cancelEditBtn) {
+  cancelEditBtn.addEventListener("click", resetForm);
+}
+
+if (filterSport) {
+  filterSport.addEventListener("change", renderHistory);
+}
+
+if (filterMarket) {
+  filterMarket.addEventListener("change", renderHistory);
+}
+
+if (searchMatch) {
+  searchMatch.addEventListener("input", renderHistory);
+}
+
+if (exportCsvBtn) {
+  exportCsvBtn.addEventListener("click", exportCSV);
+}
+
+if (clearAllBtn) {
+  clearAllBtn.addEventListener("click", clearAllEntries);
+}
+
+[calcMarket, calcOdd1, calcOddX, calcOdd2].forEach((el) => {
+  if (!el) return;
   el.addEventListener("input", updateToolCalculator);
   el.addEventListener("change", updateToolCalculator);
 });
@@ -1221,13 +1249,7 @@ installBtn.addEventListener("click", async () => {
   installBtn.classList.add("hidden");
 });
 
-if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(err => {
-      console.error("Service Worker registration failed:", err);
-    });
-  });
-}
+
 
 function initAuthActions() {
   if (authLoginBtn) {
@@ -1254,16 +1276,21 @@ function initAuthActions() {
 }
 
 async function init() {
-  createAuthUI();
-  createBookmakerCards();
-  bindDynamicBookmakerInputs();
-  loadEntries();
-  resetForm();
-  updateToolCalculator();
-  renderAll();
-  initAuthActions();
-  await initSupabase();
-  updateAuthUI();
+  try {
+    createAuthUI();
+    createBookmakerCards();
+    bindDynamicBookmakerInputs();
+    loadEntries();
+    resetForm();
+    updateToolCalculator();
+    renderAll();
+    initAuthActions();
+    await initSupabase();
+    updateAuthUI();
+  } catch (err) {
+    console.error("APP INIT ERROR:", err);
+    alert("Υπάρχει JavaScript error στο app. Άνοιξε console και δες το APP INIT ERROR.");
+  }
 }
 
 init();
