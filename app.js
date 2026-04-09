@@ -814,13 +814,6 @@ installBtn.addEventListener("click", async () => {
   installBtn.classList.add("hidden");
 });
 
-if ("serviceWorker" in navigator && window.location.protocol !== "file:") {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(err => {
-      console.error("Service Worker registration failed:", err);
-    });
-  });
-}
 
 function init() {
   createBookmakerCards();
