@@ -440,16 +440,27 @@ function getFilteredEntries() {
   const selectedMarket = filterMarket.value;
   const query = searchMatch.value.trim().toLowerCase();
 
-  return entries.filter(item => {
-    const sportMatch = selectedSport === "all" || item.sport === selectedSport;
-    const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
-    const textMatch =
-      !query ||
-      item.matchName.toLowerCase().includes(query) ||
-      (item.notes || "").toLowerCase().includes(query);
+  return entries
+    .filter(item => {
+      const sportMatch = selectedSport === "all" || item.sport === selectedSport;
+      const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
+      const textMatch =
+        !query ||
+        item.matchName.toLowerCase().includes(query) ||
+        (item.notes || "").toLowerCase().includes(query);
 
-    return sportMatch && marketMatch && textMatch;
-  });
+      return sportMatch && marketMatch && textMatch;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.matchDate).getTime();
+      const dateB = new Date(b.matchDate).getTime();
+
+      if (dateB !== dateA) {
+        return dateB - dateA; // πιο πρόσφατη ημερομηνία πρώτη
+      }
+
+      return 0;
+    });
 }
 
 function toggleExpandEntry(id) {
@@ -521,10 +532,7 @@ function renderHistory() {
 
   let html = "";
 
-  filtered
-    .slice()
-    .reverse()
-    .forEach(item => {
+  filtered.forEach(item => {
       const isExpanded = expandedEntryIds.has(item.id);
 
       html += `
