@@ -1485,3 +1485,134 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== EDIT / SEARCH / HISTORY DETAILS ===== */
+
+.edit-banner {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(65, 215, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(65,215,255,0.08), rgba(139,92,246,0.08)),
+    rgba(255,255,255,0.02);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.edit-banner p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.history-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.history-search {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+
+.history-search input {
+  width: 100%;
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 13px 14px;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+    rgba(6, 11, 22, 0.92);
+  outline: none;
+}
+
+.history-search input::placeholder {
+  color: #6d7f9f;
+}
+
+.history-search input:focus {
+  border-color: rgba(65, 215, 255, 0.24);
+  box-shadow:
+    0 0 0 4px rgba(65, 215, 255, 0.08),
+    0 10px 26px rgba(0,0,0,0.18);
+}
+
+.history-detail-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.history-detail-wrap {
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+}
+
+.history-detail-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.05);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+    rgba(255,255,255,0.02);
+}
+
+.history-detail-card + .history-detail-card {
+  margin-top: 12px;
+}
+
+.history-detail-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.history-detail-top strong {
+  font-size: 1rem;
+}
+
+.history-detail-top span {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.history-detail-grid label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.history-detail-grid p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+@media (max-width: 940px) {
+  .edit-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,4 @@
-const STORAGE_KEY = "bet_tracker_entries_v2";
+const STORAGE_KEY = "bet_tracker_entries_v3";
 
 const BOOKMAKERS = [
   "Stoiximan",
@@ -12,6 +12,8 @@ const BOOKMAKERS = [
 
 let entries = [];
 let deferredPrompt = null;
+let currentEditId = null;
+let expandedEntryIds = new Set();
 
 const navButtons = document.querySelectorAll(".nav-btn");
 const sections = document.querySelectorAll(".page-section");
@@ -25,6 +27,11 @@ const matchName = document.getElementById("matchName");
 const result = document.getElementById("result");
 const notes = document.getElementById("notes");
 const bookmakersGrid = document.getElementById("bookmakersGrid");
+
+const entryFormTitle = document.getElementById("entryFormTitle");
+const editBanner = document.getElementById("editBanner");
+const cancelEditBtn = document.getElementById("cancelEditBtn");
+const submitEntryBtn = document.getElementById("submitEntryBtn");
 
 const previewStake = document.getElementById("previewStake");
 const previewMargin = document.getElementById("previewMargin");
@@ -49,6 +56,7 @@ const roiValue = document.getElementById("roiValue");
 
 const filterSport = document.getElementById("filterSport");
 const filterMarket = document.getElementById("filterMarket");
+const searchMatch = document.getElementById("searchMatch");
 
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
@@ -203,6 +211,10 @@ function updateBookmakerCardVisuals() {
     el.style.display = is1X2 ? "flex" : "none";
   });
 
+  document.querySelectorAll(".x-field-card").forEach((el) => {
+    el.style.display = is1X2 ? "block" : "none";
+  });
+
   if (!is1X2 && result.value === "X") {
     result.value = "";
   }
@@ -305,14 +317,63 @@ function resetBookmakerInputs() {
   });
 }
 
+function enterCreateMode() {
+  currentEditId = null;
+  entryFormTitle.textContent = "Νέα Καταχώριση Αγώνα";
+  submitEntryBtn.textContent = "Αποθήκευση";
+  editBanner.classList.add("hidden");
+}
+
+function enterEditMode() {
+  entryFormTitle.textContent = "Επεξεργασία Καταχώρισης";
+  submitEntryBtn.textContent = "Update Entry";
+  editBanner.classList.remove("hidden");
+}
+
 function resetForm() {
   betForm.reset();
   matchDate.value = new Date().toISOString().split("T")[0];
   sport.value = "football";
   market.value = "1X2";
   result.value = "";
+  notes.value = "";
   resetBookmakerInputs();
+  enterCreateMode();
   updatePreview();
+}
+
+function populateFormFromEntry(entry) {
+  matchDate.value = entry.matchDate || "";
+  sport.value = entry.sport || "football";
+  market.value = entry.market || "1X2";
+  matchName.value = entry.matchName || "";
+  result.value = entry.result || "";
+  notes.value = entry.notes || "";
+
+  resetBookmakerInputs();
+
+  BOOKMAKERS.forEach((name, index) => {
+    const bm = (entry.bookmakers || []).find((x) => x.name === name);
+    if (!bm) return;
+
+    const setField = (field, value) => {
+      const el = document.querySelector(`[data-bm-index="${index}"][data-field="${field}"]`);
+      if (el) el.value = value ?? (field.startsWith("stake") ? "0" : "");
+    };
+
+    setField("odd1", bm.odd1 || "");
+    setField("oddX", bm.oddX || "");
+    setField("odd2", bm.odd2 || "");
+    setField("stake1", bm.stake1 ?? 0);
+    setField("stakeX", bm.stakeX ?? 0);
+    setField("stake2", bm.stake2 ?? 0);
+  });
+
+  currentEditId = entry.id;
+  enterEditMode();
+  updatePreview();
+  switchSection("new-entry");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function renderStats() {
@@ -359,17 +420,73 @@ function renderRecentEntries() {
 function getFilteredEntries() {
   const selectedSport = filterSport.value;
   const selectedMarket = filterMarket.value;
+  const query = searchMatch.value.trim().toLowerCase();
 
   return entries.filter(item => {
     const sportMatch = selectedSport === "all" || item.sport === selectedSport;
     const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
-    return sportMatch && marketMatch;
+    const textMatch =
+      !query ||
+      item.matchName.toLowerCase().includes(query) ||
+      (item.notes || "").toLowerCase().includes(query);
+
+    return sportMatch && marketMatch && textMatch;
   });
 }
 
-function formatMaybePL(value, marketType) {
-  if (marketType === "1-2" && value === null) return "-";
-  return formatCurrency(value || 0);
+function toggleExpandEntry(id) {
+  if (expandedEntryIds.has(id)) expandedEntryIds.delete(id);
+  else expandedEntryIds.add(id);
+  renderHistory();
+}
+
+window.toggleExpandEntry = toggleExpandEntry;
+
+function editEntry(id) {
+  const entry = entries.find((item) => item.id === id);
+  if (!entry) return;
+  populateFormFromEntry(entry);
+}
+
+window.editEntry = editEntry;
+
+function getBookmakerDetailHtml(item) {
+  const rows = (item.bookmakers || [])
+    .filter((bm) => bm.totalStake > 0 || bm.odd1 || bm.oddX || bm.odd2)
+    .map((bm) => `
+      <div class="history-detail-card">
+        <div class="history-detail-top">
+          <strong>${bm.name}</strong>
+          <span>${formatPercent(bm.margin)}</span>
+        </div>
+        <div class="history-detail-grid">
+          <div><label>Odds</label><p>${item.market === "1X2"
+            ? `1: ${bm.odd1 || "-"} | X: ${bm.oddX || "-"} | 2: ${bm.odd2 || "-"}`
+            : `1: ${bm.odd1 || "-"} | 2: ${bm.odd2 || "-"}`
+          }</p></div>
+          <div><label>Stakes</label><p>${item.market === "1X2"
+            ? `1: ${formatCurrency(bm.stake1)} | X: ${formatCurrency(bm.stakeX)} | 2: ${formatCurrency(bm.stake2)}`
+            : `1: ${formatCurrency(bm.stake1)} | 2: ${formatCurrency(bm.stake2)}`
+          }</p></div>
+          <div><label>Total Stake</label><p>${formatCurrency(bm.totalStake)}</p></div>
+          <div><label>Returns</label><p>${item.market === "1X2"
+            ? `1: ${formatCurrency(bm.return1)} | X: ${formatCurrency(bm.returnX)} | 2: ${formatCurrency(bm.return2)}`
+            : `1: ${formatCurrency(bm.return1)} | 2: ${formatCurrency(bm.return2)}`
+          }</p></div>
+        </div>
+      </div>
+    `)
+    .join("");
+
+  return `
+    <tr class="history-detail-row">
+      <td colspan="12">
+        <div class="history-detail-wrap">
+          ${rows || `<div class="empty-state">Δεν υπάρχουν bookmaker details.</div>`}
+        </div>
+      </td>
+    </tr>
+  `;
 }
 
 function renderHistory() {
@@ -384,36 +501,49 @@ function renderHistory() {
     return;
   }
 
-  historyTableBody.innerHTML = filtered
+  let html = "";
+
+  filtered
     .slice()
     .reverse()
-    .map(item => `
-      <tr>
-        <td>${item.matchDate}</td>
-        <td>${getSportLabel(item.sport)}</td>
-        <td>
-          <strong>${item.matchName}</strong>
-          ${item.notes ? `<div class="muted">${item.notes}</div>` : ""}
-        </td>
-        <td>${item.market}</td>
-        <td>${item.usedBookmakersCount}</td>
-        <td>${formatCurrency(item.totalStake)}</td>
-        <td>${formatPercent(item.weightedMargin)}</td>
-        <td class="${item.pl1 > 0 ? "positive" : item.pl1 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl1)}</td>
-        <td>${item.market === "1X2"
-          ? `<span class="${item.plX > 0 ? "positive" : item.plX < 0 ? "negative" : "neutral"}">${formatCurrency(item.plX)}</span>`
-          : "-"
-        }</td>
-        <td class="${item.pl2 > 0 ? "positive" : item.pl2 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl2)}</td>
-        <td class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</td>
-        <td>
-          <div class="row-actions">
-            <button class="small-btn delete" onclick="deleteEntry('${item.id}')">Delete</button>
-          </div>
-        </td>
-      </tr>
-    `)
-    .join("");
+    .forEach(item => {
+      const isExpanded = expandedEntryIds.has(item.id);
+
+      html += `
+        <tr>
+          <td>${item.matchDate}</td>
+          <td>${getSportLabel(item.sport)}</td>
+          <td>
+            <strong>${item.matchName}</strong>
+            ${item.notes ? `<div class="muted">${item.notes}</div>` : ""}
+          </td>
+          <td>${item.market}</td>
+          <td>${item.usedBookmakersCount}</td>
+          <td>${formatCurrency(item.totalStake)}</td>
+          <td>${formatPercent(item.weightedMargin)}</td>
+          <td class="${item.pl1 > 0 ? "positive" : item.pl1 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl1)}</td>
+          <td>${item.market === "1X2"
+            ? `<span class="${item.plX > 0 ? "positive" : item.plX < 0 ? "negative" : "neutral"}">${formatCurrency(item.plX)}</span>`
+            : "-"
+          }</td>
+          <td class="${item.pl2 > 0 ? "positive" : item.pl2 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl2)}</td>
+          <td class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</td>
+          <td>
+            <div class="row-actions">
+              <button class="small-btn" onclick="toggleExpandEntry('${item.id}')">${isExpanded ? "Hide" : "Details"}</button>
+              <button class="small-btn" onclick="editEntry('${item.id}')">Edit</button>
+              <button class="small-btn delete" onclick="deleteEntry('${item.id}')">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+
+      if (isExpanded) {
+        html += getBookmakerDetailHtml(item);
+      }
+    });
+
+  historyTableBody.innerHTML = html;
 }
 
 function renderAll() {
@@ -422,24 +552,12 @@ function renderAll() {
   renderHistory();
 }
 
-function addEntry(event) {
-  event.preventDefault();
-
-  if (!matchName.value.trim()) {
-    alert("Συμπλήρωσε όνομα αγώνα.");
-    return;
-  }
-
+function buildEntryFromForm() {
   const bookmakers = getAllBookmakersFromForm();
   const aggregate = computeAggregate(bookmakers, market.value, result.value);
 
-  if (!aggregate.totalStake) {
-    alert("Συμπλήρωσε τουλάχιστον ένα stake σε κάποια στοιχηματική.");
-    return;
-  }
-
-  const entry = {
-    id: crypto.randomUUID(),
+  return {
+    id: currentEditId || crypto.randomUUID(),
     matchDate: matchDate.value,
     sport: sport.value,
     market: market.value,
@@ -459,8 +577,30 @@ function addEntry(event) {
     actualReturn: aggregate.actualReturn,
     actualPL: aggregate.actualPL
   };
+}
 
-  entries.push(entry);
+function addOrUpdateEntry(event) {
+  event.preventDefault();
+
+  if (!matchName.value.trim()) {
+    alert("Συμπλήρωσε όνομα αγώνα.");
+    return;
+  }
+
+  const candidate = buildEntryFromForm();
+
+  if (!candidate.totalStake) {
+    alert("Συμπλήρωσε τουλάχιστον ένα stake σε κάποια στοιχηματική.");
+    return;
+  }
+
+  if (currentEditId) {
+    entries = entries.map((item) => item.id === currentEditId ? candidate : item);
+    expandedEntryIds.add(candidate.id);
+  } else {
+    entries.push(candidate);
+  }
+
   saveEntries();
   renderAll();
   resetForm();
@@ -472,6 +612,10 @@ function deleteEntry(id) {
   if (!confirmed) return;
 
   entries = entries.filter(item => item.id !== id);
+  expandedEntryIds.delete(id);
+  if (currentEditId === id) {
+    resetForm();
+  }
   saveEntries();
   renderAll();
 }
@@ -519,12 +663,7 @@ function exportCSV() {
 
   entries.forEach(entry => {
     entry.bookmakers.forEach(bm => {
-      if (
-        bm.totalStake > 0 ||
-        bm.odd1 > 0 ||
-        bm.oddX > 0 ||
-        bm.odd2 > 0
-      ) {
+      if (bm.totalStake > 0 || bm.odd1 > 0 || bm.oddX > 0 || bm.odd2 > 0) {
         rows.push([
           entry.matchDate,
           entry.sport,
@@ -576,6 +715,8 @@ function clearAllEntries() {
   if (!confirmed) return;
 
   entries = [];
+  expandedEntryIds.clear();
+  resetForm();
   saveEntries();
   renderAll();
 }
@@ -631,10 +772,14 @@ navButtons.forEach(btn => {
 market.addEventListener("change", updatePreview);
 result.addEventListener("change", updatePreview);
 
-betForm.addEventListener("submit", addEntry);
+betForm.addEventListener("submit", addOrUpdateEntry);
 resetFormBtn.addEventListener("click", resetForm);
+cancelEditBtn.addEventListener("click", resetForm);
+
 filterSport.addEventListener("change", renderHistory);
 filterMarket.addEventListener("change", renderHistory);
+searchMatch.addEventListener("input", renderHistory);
+
 exportCsvBtn.addEventListener("click", exportCSV);
 clearAllBtn.addEventListener("click", clearAllEntries);
 

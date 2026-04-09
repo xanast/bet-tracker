@@ -58,8 +58,8 @@
           <span class="mini-pill">Multi-bookmaker</span>
         </div>
         <p>
-          Καταχώρισε ένα ματς και μοίρασε odds/stakes σε πολλές στοιχηματικές.
-          Το app υπολογίζει margin ανά bookmaker και συνολικά weighted metrics.
+          Καταχώρισε ένα ματς, μοίρασε stakes σε πολλές στοιχηματικές,
+          κάνε edit αργότερα και κράτα πλήρες ιστορικό.
         </p>
       </div>
 
@@ -92,8 +92,8 @@
             <div class="hero-badge">Premium Release UI</div>
             <h3>Track every match across multiple bookmakers.</h3>
             <p>
-              Κατέγραφε διαφορετικές αποδόσεις και διαφορετικά stakes ανά bookmaker,
-              δες margin ανά εταιρεία, weighted margin συνολικά και portfolio P/L ανά outcome.
+              Κατέγραφε διαφορετικές αποδόσεις και stakes ανά bookmaker,
+              δες weighted margin συνολικά και portfolio P/L ανά outcome.
             </p>
           </div>
 
@@ -187,7 +187,7 @@
 
               <div class="summary-row">
                 <span class="summary-dot purple"></span>
-                <p>Portfolio returns και P/L για 1 / X / 2 ή για 1 / 2 σε two-way markets.</p>
+                <p>Search, edit και detailed history για να μην ξαναγράφεις entries από την αρχή.</p>
               </div>
 
               <div class="summary-row">
@@ -204,8 +204,16 @@
           <div class="panel-head">
             <div>
               <span class="panel-kicker">New Match Entry</span>
-              <h3>Νέα Καταχώριση Αγώνα</h3>
+              <h3 id="entryFormTitle">Νέα Καταχώριση Αγώνα</h3>
             </div>
+          </div>
+
+          <div id="editBanner" class="edit-banner hidden">
+            <div>
+              <strong>Editing existing entry</strong>
+              <p>Κάνε αλλαγές και πάτα Update Entry για να αποθηκευτούν.</p>
+            </div>
+            <button type="button" id="cancelEditBtn" class="secondary-btn">Cancel Edit</button>
           </div>
 
           <form id="betForm" class="bet-form">
@@ -314,7 +322,7 @@
             </div>
 
             <div class="form-actions">
-              <button type="submit" class="primary-btn glow-btn">Αποθήκευση</button>
+              <button type="submit" id="submitEntryBtn" class="primary-btn glow-btn">Αποθήκευση</button>
               <button type="button" id="resetFormBtn" class="secondary-btn">Καθαρισμός</button>
             </div>
           </form>
@@ -329,18 +337,24 @@
               <h3>Ιστορικό Αγώνων</h3>
             </div>
 
-            <div class="filters history-filters">
-              <select id="filterSport">
-                <option value="all">Όλα τα αθλήματα</option>
-                <option value="football">Ποδόσφαιρο</option>
-                <option value="basketball">Μπάσκετ</option>
-              </select>
+            <div class="history-controls">
+              <div class="history-search">
+                <input type="text" id="searchMatch" placeholder="Search by match..." />
+              </div>
 
-              <select id="filterMarket">
-                <option value="all">Όλα τα markets</option>
-                <option value="1X2">1X2</option>
-                <option value="1-2">1-2</option>
-              </select>
+              <div class="filters history-filters">
+                <select id="filterSport">
+                  <option value="all">Όλα τα αθλήματα</option>
+                  <option value="football">Ποδόσφαιρο</option>
+                  <option value="basketball">Μπάσκετ</option>
+                </select>
+
+                <select id="filterMarket">
+                  <option value="all">Όλα τα markets</option>
+                  <option value="1X2">1X2</option>
+                  <option value="1-2">1-2</option>
+                </select>
+              </div>
             </div>
           </div>
 
