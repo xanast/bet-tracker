@@ -14,7 +14,7 @@ let entries = [];
 let deferredPrompt = null;
 let currentEditId = null;
 let expandedEntryIds = new Set();
-let supabase = null;
+let supabaseClient = null;
 let currentUser = null;
 let authReady = false;
 let isSyncing = false;
@@ -751,14 +751,14 @@ async function initSupabase() {
       return;
     }
 
-    supabase = window.supabase.createClient(
+    supabaseClient = window.supabase.createClient(
       window.SUPABASE_URL,
       window.SUPABASE_ANON_KEY
     );
 
     authReady = true;
 
-    const { data, error } = await supabase.auth.getSession();
+    const { data, error } = await supabaseClient.auth.getSession();
     if (error) {
       console.error(error);
       setAuthStatus("Αποτυχία φόρτωσης auth session.");
@@ -768,7 +768,7 @@ async function initSupabase() {
     currentUser = data.session?.user || null;
     updateAuthUI();
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       currentUser = session?.user || null;
       updateAuthUI();
 
@@ -794,7 +794,7 @@ async function signUpWithEmail() {
 
   setAuthStatus("Creating account...");
 
-  const { error } = await supabase.auth.signUp({
+  const { error } = await supabaseClient.auth.signUp({
     email,
     password
   });
@@ -820,7 +820,7 @@ async function loginWithEmail() {
 
   setAuthStatus("Logging in...");
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { error } = await supabaseClient.auth.signInWithPassword({
     email,
     password
   });
@@ -836,8 +836,8 @@ async function loginWithEmail() {
 }
 
 async function logoutUser() {
-  if (!supabase) return;
-  const { error } = await supabase.auth.signOut();
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.auth.signOut();
   if (error) {
     alert(error.message);
     return;
