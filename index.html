@@ -6,7 +6,7 @@
   <title>Bet Margin Tracker</title>
   <meta name="theme-color" content="#0b1020" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="bg-orb orb-1"></div>
@@ -55,18 +55,18 @@
       <div class="sidebar-card premium-card">
         <div class="sidebar-card-head">
           <h3>Quick Notes</h3>
-          <span class="mini-pill">Local</span>
+          <span class="mini-pill">Multi-bookmaker</span>
         </div>
         <p>
-          Καταχώρισε αγώνες, δες γκανιότα, κράτα πλήρες αρχείο και κάνε export CSV
-          με software-like εμπειρία.
+          Καταχώρισε ένα ματς και μοίρασε odds/stakes σε πολλές στοιχηματικές.
+          Το app υπολογίζει margin ανά bookmaker και συνολικά weighted metrics.
         </p>
       </div>
 
       <div class="sidebar-footer">
-        <div class="footer-chip">Football 1X2</div>
-        <div class="footer-chip">Basket 1-2</div>
-        <div class="footer-chip">ROI</div>
+        <div class="footer-chip">Stoiximan</div>
+        <div class="footer-chip">Novibet</div>
+        <div class="footer-chip">Bet365</div>
       </div>
     </aside>
 
@@ -90,10 +90,10 @@
         <div class="hero-panel">
           <div class="hero-copy">
             <div class="hero-badge">Premium Release UI</div>
-            <h3>Track every match like a real betting analytics workspace.</h3>
+            <h3>Track every match across multiple bookmakers.</h3>
             <p>
-              Κατέγραφε αγώνες, stakes, αποδόσεις, actual return, margin και συνολικό ROI
-              με καθαρό dashboard και full mobile-friendly layout.
+              Κατέγραφε διαφορετικές αποδόσεις και διαφορετικά stakes ανά bookmaker,
+              δες margin ανά εταιρεία, weighted margin συνολικά και portfolio P/L ανά outcome.
             </p>
           </div>
 
@@ -138,7 +138,7 @@
 
           <div class="stat-card tilt-card">
             <div class="stat-top">
-              <span>Μέση Γκανιότα</span>
+              <span>Μέση Weighted Γκανιότα</span>
               <span class="stat-icon">%</span>
             </div>
             <strong id="avgMargin">0.00%</strong>
@@ -177,22 +177,22 @@
             <div class="summary-box">
               <div class="summary-row">
                 <span class="summary-dot cyan"></span>
-                <p>Υπολογισμός bookmaker margin (γκανιότα) ανά market.</p>
+                <p>Margin ανά bookmaker με βάση τις αποδόσεις που περνάς σε κάθε εταιρεία.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot green"></span>
-                <p>Πλήρες tracking για odds, stakes, returns και actual αποτέλεσμα.</p>
+                <p>Weighted συνολική γκανιότα με βάση το stake που έπαιξες σε κάθε bookmaker.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot purple"></span>
-                <p>Υποστήριξη για ποδόσφαιρο 1X2 και μπάσκετ / 2-way 1-2.</p>
+                <p>Portfolio returns και P/L για 1 / X / 2 ή για 1 / 2 σε two-way markets.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot orange"></span>
-                <p>CSV export για ιστορικό, αρχειοθέτηση και εξωτερικό analysis.</p>
+                <p>CSV export για πλήρες αρχείο των ματς και των επιμέρους bookmakers.</p>
               </div>
             </div>
           </div>
@@ -237,36 +237,6 @@
               </div>
 
               <div class="field">
-                <label for="odd1">Απόδοση 1</label>
-                <input type="number" step="0.01" id="odd1" placeholder="2.10" required />
-              </div>
-
-              <div class="field x-field">
-                <label for="oddX">Απόδοση Χ</label>
-                <input type="number" step="0.01" id="oddX" placeholder="3.20" />
-              </div>
-
-              <div class="field">
-                <label for="odd2">Απόδοση 2</label>
-                <input type="number" step="0.01" id="odd2" placeholder="2.80" required />
-              </div>
-
-              <div class="field">
-                <label for="stake1">Ποντάρισμα 1</label>
-                <input type="number" step="0.01" id="stake1" placeholder="0.00" value="0" />
-              </div>
-
-              <div class="field x-field">
-                <label for="stakeX">Ποντάρισμα Χ</label>
-                <input type="number" step="0.01" id="stakeX" placeholder="0.00" value="0" />
-              </div>
-
-              <div class="field">
-                <label for="stake2">Ποντάρισμα 2</label>
-                <input type="number" step="0.01" id="stake2" placeholder="0.00" value="0" />
-              </div>
-
-              <div class="field">
                 <label for="result">Αποτέλεσμα</label>
                 <select id="result">
                   <option value="">Δεν έχει κριθεί ακόμα</option>
@@ -282,34 +252,63 @@
               </div>
             </div>
 
-            <div class="preview-grid">
+            <div class="panel-head bookmaker-head">
+              <div>
+                <span class="panel-kicker">Bookmakers</span>
+                <h3>Αποδόσεις & Stakes ανά Στοιχηματική</h3>
+              </div>
+            </div>
+
+            <div id="bookmakersGrid" class="bookmakers-grid"></div>
+
+            <div class="preview-grid preview-grid-extended">
               <div class="preview-card premium-mini-card">
                 <span>Συνολικό Stake</span>
                 <strong id="previewStake">€0.00</strong>
               </div>
 
               <div class="preview-card premium-mini-card">
-                <span>Γκανιότα</span>
+                <span>Weighted Γκανιότα</span>
                 <strong id="previewMargin">0.00%</strong>
               </div>
 
               <div class="preview-card premium-mini-card">
-                <span>Επιστροφή αν βγει 1</span>
+                <span>Return αν βγει 1</span>
                 <strong id="previewReturn1">€0.00</strong>
               </div>
 
               <div class="preview-card premium-mini-card x-field-card">
-                <span>Επιστροφή αν βγει Χ</span>
+                <span>Return αν βγει Χ</span>
                 <strong id="previewReturnX">€0.00</strong>
               </div>
 
               <div class="preview-card premium-mini-card">
-                <span>Επιστροφή αν βγει 2</span>
+                <span>Return αν βγει 2</span>
                 <strong id="previewReturn2">€0.00</strong>
               </div>
 
               <div class="preview-card premium-mini-card">
-                <span>Καθαρό Αποτέλεσμα</span>
+                <span>Actual Return</span>
+                <strong id="previewActualReturn">€0.00</strong>
+              </div>
+
+              <div class="preview-card premium-mini-card">
+                <span>P/L αν βγει 1</span>
+                <strong id="previewPL1">€0.00</strong>
+              </div>
+
+              <div class="preview-card premium-mini-card x-field-card">
+                <span>P/L αν βγει Χ</span>
+                <strong id="previewPLX">€0.00</strong>
+              </div>
+
+              <div class="preview-card premium-mini-card">
+                <span>P/L αν βγει 2</span>
+                <strong id="previewPL2">€0.00</strong>
+              </div>
+
+              <div class="preview-card premium-mini-card">
+                <span>Actual P/L</span>
                 <strong id="previewPL">€0.00</strong>
               </div>
             </div>
@@ -329,14 +328,14 @@
               <span class="panel-kicker">Full Archive</span>
               <h3>Ιστορικό Αγώνων</h3>
             </div>
-      
+
             <div class="filters history-filters">
               <select id="filterSport">
                 <option value="all">Όλα τα αθλήματα</option>
                 <option value="football">Ποδόσφαιρο</option>
                 <option value="basketball">Μπάσκετ</option>
               </select>
-      
+
               <select id="filterMarket">
                 <option value="all">Όλα τα markets</option>
                 <option value="1X2">1X2</option>
@@ -344,7 +343,7 @@
               </select>
             </div>
           </div>
-      
+
           <div class="premium-table-wrap history-table-wrap">
             <div class="table-wrap">
               <table>
@@ -354,13 +353,13 @@
                     <th>Άθλημα</th>
                     <th>Ματς</th>
                     <th>Market</th>
-                    <th>Odds</th>
-                    <th>Stakes</th>
+                    <th>Bookmakers</th>
                     <th>Stake</th>
-                    <th>Margin</th>
-                    <th>Result</th>
-                    <th>Return</th>
-                    <th>P/L</th>
+                    <th>Weighted Margin</th>
+                    <th>P/L 1</th>
+                    <th>P/L X</th>
+                    <th>P/L 2</th>
+                    <th>Actual P/L</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -370,7 +369,7 @@
           </div>
         </div>
       </section>
-      
+
       <section id="tools" class="page-section">
         <div class="tools-grid">
           <div class="panel premium-card">
@@ -429,23 +428,5 @@
   </div>
 
   <script src="app.js"></script>
-  <script>
-    const goNewEntryBtn = document.getElementById("goNewEntryBtn");
-    const goHistoryBtn = document.getElementById("goHistoryBtn");
-
-    if (goNewEntryBtn) {
-      goNewEntryBtn.addEventListener("click", () => {
-        const btn = document.querySelector('.nav-btn[data-section="new-entry"]');
-        if (btn) btn.click();
-      });
-    }
-
-    if (goHistoryBtn) {
-      goHistoryBtn.addEventListener("click", () => {
-        const btn = document.querySelector('.nav-btn[data-section="history"]');
-        if (btn) btn.click();
-      });
-    }
-  </script>
 </body>
 </html>

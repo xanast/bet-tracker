@@ -1361,3 +1361,127 @@ tbody tr:hover {
     min-width: 920px;
   }
 }
+/* ===== MULTI BOOKMAKER UI ===== */
+
+.bookmaker-head {
+  margin-top: 8px;
+}
+
+.bookmakers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.bookmaker-card {
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)),
+    rgba(8, 13, 26, 0.78);
+  box-shadow: var(--shadow-md);
+  min-width: 0;
+}
+
+.bookmaker-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.bookmaker-card-head h4 {
+  margin: 4px 0 0;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+
+.bookmaker-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.bookmaker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.bookmaker-badge strong {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.bookmaker-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.preview-grid-extended {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.history-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.history-table-wrap .table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+#history table {
+  width: 100%;
+  min-width: 1200px;
+}
+
+@media (max-width: 1300px) {
+  .bookmakers-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-grid-extended {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 940px) {
+  .bookmaker-card-head {
+    flex-direction: column;
+  }
+
+  .bookmaker-badges {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .bookmaker-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-grid-extended {
+    grid-template-columns: 1fr;
+  }
+}
