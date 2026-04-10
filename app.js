@@ -149,10 +149,11 @@ function sortEntriesByDateDesc(list) {
 
 function calculateMargin(marketType, o1, ox, o2) {
   if (marketType === "1X2") {
-    if (!o1 || !ox || !o2) return 0;
+    if (!o1 || !ox || !o2) return null;
     return ((1 / o1) + (1 / ox) + (1 / o2) - 1) * 100;
   }
-  if (!o1 || !o2) return 0;
+
+  if (!o1 || !o2) return null;
   return ((1 / o1) + (1 / o2) - 1) * 100;
 }
 
@@ -296,9 +297,16 @@ function computeAggregate(bookmakers, marketType, selectedResult) {
     : 0;
   const totalReturn2 = bookmakers.reduce((sum, bm) => sum + Number(bm.return2 || 0), 0);
 
-  const weightedMargin = totalStake
-    ? bookmakers.reduce((sum, bm) => sum + (Number(bm.margin || 0) * Number(bm.totalStake || 0)), 0) / totalStake
-    : 0;
+  const bookmakersWithValidMargin = bookmakers.filter(
+    (bm) => bm.margin !== null && bm.margin !== undefined && Number(bm.totalStake || 0) > 0
+  );
+
+  const weightedMargin = bookmakersWithValidMargin.length && totalStake
+    ? bookmakersWithValidMargin.reduce(
+        (sum, bm) => sum + (Number(bm.margin || 0) * Number(bm.totalStake || 0)),
+        0
+      ) / totalStake
+    : null;
 
   const pl1 = totalReturn1 - totalStake;
   const plX = totalReturnX - totalStake;
@@ -415,9 +423,13 @@ function updateBookmakerCardVisuals() {
     const marginEl = document.getElementById(`margin-${index}`);
     const stakeEl = document.getElementById(`stake-total-${index}`);
 
-    if (marginEl) marginEl.textContent = formatPercent(bookmaker.margin);
+    if (marginEl) marginEl.textContent = formatMargin(bookmaker.margin);
     if (stakeEl) stakeEl.textContent = formatCurrency(bookmaker.totalStake);
   });
+}
+
+function formatMargin(value) {
+  return value === null || value === undefined ? "N/A" : `${Number(value).toFixed(2)}%`;
 }
 
 function setValueClass(el, value) {
@@ -437,7 +449,7 @@ function updatePreview() {
   const aggregate = computeAggregate(bookmakers, market?.value || "1X2", result?.value || "");
 
   previewStake.textContent = formatCurrency(aggregate.totalStake);
-  previewMargin.textContent = formatPercent(aggregate.weightedMargin);
+  previewMargin.textContent = formatMargin(aggregate.weightedMargin);
   previewReturn1.textContent = formatCurrency(aggregate.totalReturn1);
   previewReturnX.textContent = formatCurrency(aggregate.totalReturnX);
   previewReturn2.textContent = formatCurrency(aggregate.totalReturn2);
@@ -545,7 +557,7 @@ function renderStats() {
   totalStake.textContent = formatCurrency(sumStake);
   totalReturn.textContent = formatCurrency(sumReturn);
   totalPL.textContent = formatCurrency(sumPL);
-  avgMargin.textContent = formatPercent(marginAverage);
+  avgMargin.textContent = formatMargin(marginAverage);
   roiValue.textContent = formatPercent(roi);
 
   setValueClass(totalPL, sumPL);
@@ -575,7 +587,7 @@ function renderRecentEntries() {
       <div class="recent-item">
         <h4>${item.matchName}</h4>
         <p>${item.matchDate} • ${getSportLabel(item.sport)} • ${item.market}</p>
-        <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Γκανιότα: ${formatPercent(item.weightedMargin)}</p>
+        <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Γκανιότα: ${formatMargin(item.weightedMargin)}</p>
         <p>${finalState}</p>
       </div>
     `;
@@ -629,7 +641,7 @@ function getBookmakerDetailHtml(item) {
       <div class="history-detail-card">
         <div class="history-detail-top">
           <strong>${bm.name}</strong>
-          <span>Γκανιότα ${formatPercent(bm.margin)}</span>
+          <span>Γκανιότα ${formatMargin(bm.margin)}</span>
         </div>
         <div class="history-detail-grid">
           <div><label>Odds</label><p>${item.market === "1X2"
@@ -654,7 +666,7 @@ function getBookmakerDetailHtml(item) {
     <div class="history-detail-card" style="margin-bottom:12px;">
       <div class="history-detail-top">
         <strong>Match Summary</strong>
-        <span>Γκανιότα ${formatPercent(item.weightedMargin)}</span>
+        <span>Γκανιότα ${formatMargin(item.weightedMargin)}</span>
       </div>
       <div class="history-detail-grid">
         <div><label>Best Case</label><p>${getOutcomeLabel(item.market, item.bestCase.outcome)} → ${formatCurrency(item.bestCase.pl)}</p></div>
@@ -712,7 +724,7 @@ function renderHistory() {
         <td>${item.market}</td>
         <td>${item.usedBookmakersCount}</td>
         <td>${formatCurrency(item.totalStake)}</td>
-        <td>${formatPercent(item.weightedMargin)}</td>
+        <td>${formatMargin(item.weightedMargin)}</td>
         <td class="${item.pl1 > 0 ? "positive" : item.pl1 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl1)}</td>
         <td>${item.market === "1X2"
           ? `<span class="${item.plX > 0 ? "positive" : item.plX < 0 ? "negative" : "neutral"}">${formatCurrency(item.plX)}</span>`
