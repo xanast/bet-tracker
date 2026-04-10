@@ -129,7 +129,7 @@ function loadEntries() {
     }
   }
 
-  entries = loaded || [];
+  entries = (loaded || []).map(normalizeEntry);
   saveEntries();
 }
 
@@ -158,6 +158,15 @@ function calculateMargin(marketType, o1, ox, o2) {
 
 function getSportLabel(value) {
   return value === "football" ? "Ποδόσφαιρο" : "Μπάσκετ";
+}
+
+function getOutcomeLabel(marketType, outcome) {
+  if (marketType === "1-2") {
+    if (outcome === "1") return "1";
+    if (outcome === "2") return "2";
+    return "-";
+  }
+  return outcome;
 }
 
 function setAuthStatus(message) {
@@ -262,11 +271,11 @@ function getBookmakerFormValues(index) {
 
 function computeBookmakerMetrics(bookmaker, marketType) {
   const margin = calculateMargin(marketType, bookmaker.odd1, bookmaker.oddX, bookmaker.odd2);
-  const totalStake = bookmaker.stake1 + bookmaker.stakeX + bookmaker.stake2;
+  const totalStake = Number(bookmaker.stake1 || 0) + Number(bookmaker.stakeX || 0) + Number(bookmaker.stake2 || 0);
 
-  const return1 = bookmaker.stake1 * bookmaker.odd1;
-  const returnX = marketType === "1X2" ? bookmaker.stakeX * bookmaker.oddX : 0;
-  const return2 = bookmaker.stake2 * bookmaker.odd2;
+  const return1 = Number(bookmaker.stake1 || 0) * Number(bookmaker.odd1 || 0);
+  const returnX = marketType === "1X2" ? Number(bookmaker.stakeX || 0) * Number(bookmaker.oddX || 0) : 0;
+  const return2 = Number(bookmaker.stake2 || 0) * Number(bookmaker.odd2 || 0);
 
   return {
     ...bookmaker,
@@ -275,6 +284,106 @@ function computeBookmakerMetrics(bookmaker, marketType) {
     return1,
     returnX,
     return2
+  };
+}
+
+function computeAggregate(bookmakers, marketType, selectedResult) {
+  const totalStake = bookmakers.reduce((sum, bm) => sum + Number(bm.totalStake || 0), 0);
+
+  const totalReturn1 = bookmakers.reduce((sum, bm) => sum + Number(bm.return1 || 0), 0);
+  const totalReturnX = marketType === "1X2"
+    ? bookmakers.reduce((sum, bm) => sum + Number(bm.returnX || 0), 0)
+    : 0;
+  const totalReturn2 = bookmakers.reduce((sum, bm) => sum + Number(bm.return2 || 0), 0);
+
+  const weightedMargin = totalStake
+    ? bookmakers.reduce((sum, bm) => sum + (Number(bm.margin || 0) * Number(bm.totalStake || 0)), 0) / totalStake
+    : 0;
+
+  const pl1 = totalReturn1 - totalStake;
+  const plX = totalReturnX - totalStake;
+  const pl2 = totalReturn2 - totalStake;
+
+  let actualReturn = 0;
+  if (selectedResult === "1") actualReturn = totalReturn1;
+  if (selectedResult === "X" && marketType === "1X2") actualReturn = totalReturnX;
+  if (selectedResult === "2") actualReturn = totalReturn2;
+
+  const actualPL = selectedResult ? actualReturn - totalStake : 0;
+
+  const candidates = marketType === "1X2"
+    ? [
+        { outcome: "1", pl: pl1 },
+        { outcome: "X", pl: plX },
+        { outcome: "2", pl: pl2 }
+      ]
+    : [
+        { outcome: "1", pl: pl1 },
+        { outcome: "2", pl: pl2 }
+      ];
+
+  const bestCase = candidates.reduce((best, cur) => cur.pl > best.pl ? cur : best, candidates[0] || { outcome: "-", pl: 0 });
+  const worstCase = candidates.reduce((worst, cur) => cur.pl < worst.pl ? cur : worst, candidates[0] || { outcome: "-", pl: 0 });
+
+  const usedBookmakers = bookmakers.filter((bm) => bm.totalStake > 0 || bm.odd1 || bm.oddX || bm.odd2);
+
+  return {
+    bookmakers,
+    usedBookmakersCount: usedBookmakers.length,
+    totalStake,
+    totalReturn1,
+    totalReturnX,
+    totalReturn2,
+    weightedMargin,
+    pl1,
+    plX,
+    pl2,
+    actualReturn,
+    actualPL,
+    bestCase,
+    worstCase
+  };
+}
+
+function normalizeEntry(rawEntry) {
+  const entry = {
+    ...rawEntry,
+    bookmakers: Array.isArray(rawEntry.bookmakers) ? rawEntry.bookmakers : []
+  };
+
+  const computedBookmakers = entry.bookmakers.map((bm) =>
+    computeBookmakerMetrics(
+      {
+        name: bm.name,
+        odd1: Number(bm.odd1 || 0),
+        oddX: Number(bm.oddX || 0),
+        odd2: Number(bm.odd2 || 0),
+        stake1: Number(bm.stake1 || 0),
+        stakeX: Number(bm.stakeX || 0),
+        stake2: Number(bm.stake2 || 0)
+      },
+      entry.market || "1X2"
+    )
+  );
+
+  const aggregate = computeAggregate(computedBookmakers, entry.market || "1X2", entry.result || "");
+
+  return {
+    ...entry,
+    bookmakers: computedBookmakers,
+    usedBookmakersCount: aggregate.usedBookmakersCount,
+    totalStake: aggregate.totalStake,
+    totalReturn1: aggregate.totalReturn1,
+    totalReturnX: aggregate.totalReturnX,
+    totalReturn2: aggregate.totalReturn2,
+    weightedMargin: aggregate.weightedMargin,
+    pl1: aggregate.pl1,
+    plX: (entry.market || "1X2") === "1X2" ? aggregate.plX : 0,
+    pl2: aggregate.pl2,
+    actualReturn: aggregate.actualReturn,
+    actualPL: aggregate.actualPL,
+    bestCase: aggregate.bestCase,
+    worstCase: aggregate.worstCase
   };
 }
 
@@ -311,48 +420,6 @@ function updateBookmakerCardVisuals() {
   });
 }
 
-function computeAggregate(bookmakers, marketType, selectedResult) {
-  const totalStake = bookmakers.reduce((sum, bm) => sum + bm.totalStake, 0);
-
-  const totalReturn1 = bookmakers.reduce((sum, bm) => sum + bm.return1, 0);
-  const totalReturnX = marketType === "1X2"
-    ? bookmakers.reduce((sum, bm) => sum + bm.returnX, 0)
-    : 0;
-  const totalReturn2 = bookmakers.reduce((sum, bm) => sum + bm.return2, 0);
-
-  const weightedMargin = totalStake
-    ? bookmakers.reduce((sum, bm) => sum + (bm.margin * bm.totalStake), 0) / totalStake
-    : 0;
-
-  const pl1 = totalReturn1 - totalStake;
-  const plX = totalReturnX - totalStake;
-  const pl2 = totalReturn2 - totalStake;
-
-  let actualReturn = 0;
-  if (selectedResult === "1") actualReturn = totalReturn1;
-  if (selectedResult === "X" && marketType === "1X2") actualReturn = totalReturnX;
-  if (selectedResult === "2") actualReturn = totalReturn2;
-
-  const actualPL = actualReturn - totalStake;
-
-  const usedBookmakers = bookmakers.filter((bm) => bm.totalStake > 0 || bm.odd1 || bm.oddX || bm.odd2);
-
-  return {
-    bookmakers,
-    usedBookmakersCount: usedBookmakers.length,
-    totalStake,
-    totalReturn1,
-    totalReturnX,
-    totalReturn2,
-    weightedMargin,
-    pl1,
-    plX,
-    pl2,
-    actualReturn,
-    actualPL
-  };
-}
-
 function setValueClass(el, value) {
   if (!el) return;
   el.classList.remove("positive", "negative", "neutral");
@@ -379,12 +446,13 @@ function updatePreview() {
   previewPL1.textContent = formatCurrency(aggregate.pl1);
   previewPLX.textContent = formatCurrency(aggregate.plX);
   previewPL2.textContent = formatCurrency(aggregate.pl2);
-  previewPL.textContent = formatCurrency(aggregate.actualPL);
+  previewPL.textContent = result?.value ? formatCurrency(aggregate.actualPL) : "—";
 
   setValueClass(previewPL1, aggregate.pl1);
   setValueClass(previewPLX, aggregate.plX);
   setValueClass(previewPL2, aggregate.pl2);
-  setValueClass(previewPL, aggregate.actualPL);
+  if (result?.value) setValueClass(previewPL, aggregate.actualPL);
+  else previewPL.classList.remove("positive", "negative", "neutral");
 }
 
 function resetBookmakerInputs() {
@@ -463,12 +531,13 @@ function populateFormFromEntry(entry) {
 function renderStats() {
   if (!totalMatches) return;
 
-  const totalEntries = entries.length;
-  const sumStake = entries.reduce((acc, item) => acc + Number(item.totalStake || 0), 0);
-  const sumReturn = entries.reduce((acc, item) => acc + Number(item.actualReturn || 0), 0);
-  const sumPL = entries.reduce((acc, item) => acc + Number(item.actualPL || 0), 0);
+  const normalizedEntries = entries.map(normalizeEntry);
+  const totalEntries = normalizedEntries.length;
+  const sumStake = normalizedEntries.reduce((acc, item) => acc + Number(item.totalStake || 0), 0);
+  const sumReturn = normalizedEntries.reduce((acc, item) => acc + Number(item.actualReturn || 0), 0);
+  const sumPL = normalizedEntries.reduce((acc, item) => acc + Number(item.actualPL || 0), 0);
   const marginAverage = totalEntries
-    ? entries.reduce((acc, item) => acc + Number(item.weightedMargin || 0), 0) / totalEntries
+    ? normalizedEntries.reduce((acc, item) => acc + Number(item.weightedMargin || 0), 0) / totalEntries
     : 0;
   const roi = sumStake ? (sumPL / sumStake) * 100 : 0;
 
@@ -486,23 +555,31 @@ function renderStats() {
 function renderRecentEntries() {
   if (!recentEntries) return;
 
-  if (!entries.length) {
+  const normalizedEntries = sortEntriesByDateDesc(entries.map(normalizeEntry));
+
+  if (!normalizedEntries.length) {
     recentEntries.className = "recent-list empty-state";
     recentEntries.textContent = "Δεν υπάρχουν ακόμα καταχωρίσεις.";
     return;
   }
 
   recentEntries.className = "recent-list";
-  const recent = sortEntriesByDateDesc(entries).slice(0, 5);
+  const recent = normalizedEntries.slice(0, 5);
 
-  recentEntries.innerHTML = recent.map(item => `
-    <div class="recent-item">
-      <h4>${item.matchName}</h4>
-      <p>${item.matchDate} • ${getSportLabel(item.sport)} • ${item.market}</p>
-      <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Weighted Margin: ${formatPercent(item.weightedMargin)}</p>
-      <p>Actual P/L: <span class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</span></p>
-    </div>
-  `).join("");
+  recentEntries.innerHTML = recent.map(item => {
+    const finalState = item.result
+      ? `${item.result} • ${item.actualPL > 0 ? "Κέρδος" : item.actualPL < 0 ? "Χασούρα" : "Breakeven"} ${formatCurrency(item.actualPL)}`
+      : `Best: ${getOutcomeLabel(item.market, item.bestCase.outcome)} ${formatCurrency(item.bestCase.pl)} | Worst: ${getOutcomeLabel(item.market, item.worstCase.outcome)} ${formatCurrency(item.worstCase.pl)}`;
+
+    return `
+      <div class="recent-item">
+        <h4>${item.matchName}</h4>
+        <p>${item.matchDate} • ${getSportLabel(item.sport)} • ${item.market}</p>
+        <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Γκανιότα: ${formatPercent(item.weightedMargin)}</p>
+        <p>${finalState}</p>
+      </div>
+    `;
+  }).join("");
 }
 
 function getFilteredEntries() {
@@ -510,7 +587,7 @@ function getFilteredEntries() {
   const selectedMarket = filterMarket?.value || "all";
   const query = searchMatch?.value.trim().toLowerCase() || "";
 
-  return sortEntriesByDateDesc(entries).filter(item => {
+  return sortEntriesByDateDesc(entries.map(normalizeEntry)).filter(item => {
     const sportMatch = selectedSport === "all" || item.sport === selectedSport;
     const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
     const textMatch =
@@ -531,12 +608,19 @@ function toggleExpandEntry(id) {
 window.toggleExpandEntry = toggleExpandEntry;
 
 function editEntry(id) {
-  const entry = entries.find((item) => item.id === id);
+  const entry = entries.map(normalizeEntry).find((item) => item.id === id);
   if (!entry) return;
   populateFormFromEntry(entry);
 }
 
 window.editEntry = editEntry;
+
+function getSettledLabel(item) {
+  if (!item.result) return "Δεν έχει λήξει / δεν έχει οριστεί αποτέλεσμα";
+  if (item.actualPL > 0) return `Τελικό: ${item.result} • Κέρδος ${formatCurrency(item.actualPL)}`;
+  if (item.actualPL < 0) return `Τελικό: ${item.result} • Χασούρα ${formatCurrency(item.actualPL)}`;
+  return `Τελικό: ${item.result} • Breakeven`;
+}
 
 function getBookmakerDetailHtml(item) {
   const rows = (item.bookmakers || [])
@@ -545,7 +629,7 @@ function getBookmakerDetailHtml(item) {
       <div class="history-detail-card">
         <div class="history-detail-top">
           <strong>${bm.name}</strong>
-          <span>${formatPercent(bm.margin)}</span>
+          <span>Γκανιότα ${formatPercent(bm.margin)}</span>
         </div>
         <div class="history-detail-grid">
           <div><label>Odds</label><p>${item.market === "1X2"
@@ -566,10 +650,26 @@ function getBookmakerDetailHtml(item) {
     `)
     .join("");
 
+  const summary = `
+    <div class="history-detail-card" style="margin-bottom:12px;">
+      <div class="history-detail-top">
+        <strong>Match Summary</strong>
+        <span>Γκανιότα ${formatPercent(item.weightedMargin)}</span>
+      </div>
+      <div class="history-detail-grid">
+        <div><label>Best Case</label><p>${getOutcomeLabel(item.market, item.bestCase.outcome)} → ${formatCurrency(item.bestCase.pl)}</p></div>
+        <div><label>Worst Case</label><p>${getOutcomeLabel(item.market, item.worstCase.outcome)} → ${formatCurrency(item.worstCase.pl)}</p></div>
+        <div><label>Settlement</label><p>${getSettledLabel(item)}</p></div>
+        <div><label>Stake</label><p>${formatCurrency(item.totalStake)}</p></div>
+      </div>
+    </div>
+  `;
+
   return `
     <tr class="history-detail-row">
       <td colspan="12">
         <div class="history-detail-wrap">
+          ${summary}
           ${rows || `<div class="empty-state">Δεν υπάρχουν bookmaker details.</div>`}
         </div>
       </td>
@@ -596,12 +696,17 @@ function renderHistory() {
   filtered.forEach(item => {
     const isExpanded = expandedEntryIds.has(item.id);
 
+    const settledBadge = item.result
+      ? `<div class="muted">${getSettledLabel(item)}</div>`
+      : `<div class="muted">Best: ${getOutcomeLabel(item.market, item.bestCase.outcome)} ${formatCurrency(item.bestCase.pl)} | Worst: ${getOutcomeLabel(item.market, item.worstCase.outcome)} ${formatCurrency(item.worstCase.pl)}</div>`;
+
     html += `
       <tr>
         <td>${item.matchDate}</td>
         <td>${getSportLabel(item.sport)}</td>
         <td>
           <strong>${item.matchName}</strong>
+          ${settledBadge}
           ${item.notes ? `<div class="muted">${item.notes}</div>` : ""}
         </td>
         <td>${item.market}</td>
@@ -614,7 +719,10 @@ function renderHistory() {
           : "-"
         }</td>
         <td class="${item.pl2 > 0 ? "positive" : item.pl2 < 0 ? "negative" : "neutral"}">${formatCurrency(item.pl2)}</td>
-        <td class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</td>
+        <td>${item.result
+          ? `<span class="${item.actualPL > 0 ? "positive" : item.actualPL < 0 ? "negative" : "neutral"}">${formatCurrency(item.actualPL)}</span>`
+          : "—"
+        }</td>
         <td>
           <div class="row-actions">
             <button class="small-btn" onclick="toggleExpandEntry('${item.id}')">${isExpanded ? "Hide" : "Details"}</button>
@@ -650,7 +758,7 @@ function buildEntryFromForm() {
     createdAt = existing?.createdAt || nowIso;
   }
 
-  return {
+  return normalizeEntry({
     id: currentEditId || crypto.randomUUID(),
     matchDate: matchDate?.value || "",
     sport: sport?.value || "football",
@@ -672,29 +780,30 @@ function buildEntryFromForm() {
     actualPL: aggregate.actualPL,
     updatedAt: nowIso,
     createdAt
-  };
+  });
 }
 
 function mergeEntries(remoteEntries, localEntries) {
   const map = new Map();
 
   remoteEntries.forEach((item) => {
-    map.set(item.id, item);
+    map.set(item.id, normalizeEntry(item));
   });
 
   localEntries.forEach((item) => {
-    const existing = map.get(item.id);
+    const normalizedLocal = normalizeEntry(item);
+    const existing = map.get(normalizedLocal.id);
 
     if (!existing) {
-      map.set(item.id, item);
+      map.set(normalizedLocal.id, normalizedLocal);
       return;
     }
 
     const existingUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-    const localUpdated = new Date(item.updatedAt || item.createdAt || 0).getTime();
+    const localUpdated = new Date(normalizedLocal.updatedAt || normalizedLocal.createdAt || 0).getTime();
 
     if (localUpdated > existingUpdated) {
-      map.set(item.id, item);
+      map.set(normalizedLocal.id, normalizedLocal);
     }
   });
 
@@ -702,27 +811,29 @@ function mergeEntries(remoteEntries, localEntries) {
 }
 
 function entryToDbRow(entry, userId) {
+  const normalized = normalizeEntry(entry);
+
   return {
-    id: entry.id,
+    id: normalized.id,
     user_id: userId,
-    match_date: entry.matchDate,
-    sport: entry.sport,
-    market: entry.market,
-    match_name: entry.matchName,
-    result: entry.result || null,
-    notes: entry.notes || null,
-    payload: entry,
-    total_stake: entry.totalStake || 0,
-    weighted_margin: entry.weightedMargin || 0,
-    actual_return: entry.actualReturn || 0,
-    actual_pl: entry.actualPL || 0,
-    used_bookmakers_count: entry.usedBookmakersCount || 0
+    match_date: normalized.matchDate,
+    sport: normalized.sport,
+    market: normalized.market,
+    match_name: normalized.matchName,
+    result: normalized.result || null,
+    notes: normalized.notes || null,
+    payload: normalized,
+    total_stake: normalized.totalStake || 0,
+    weighted_margin: normalized.weightedMargin || 0,
+    actual_return: normalized.actualReturn || 0,
+    actual_pl: normalized.actualPL || 0,
+    used_bookmakers_count: normalized.usedBookmakersCount || 0
   };
 }
 
 function dbRowToEntry(row) {
   const payload = row.payload || {};
-  return {
+  return normalizeEntry({
     ...payload,
     id: row.id,
     matchDate: row.match_date,
@@ -738,7 +849,7 @@ function dbRowToEntry(row) {
     usedBookmakersCount: Number(row.used_bookmakers_count || payload.usedBookmakersCount || 0),
     createdAt: row.created_at || payload.createdAt || "",
     updatedAt: row.updated_at || payload.updatedAt || ""
-  };
+  });
 }
 
 async function initSupabase() {
@@ -971,7 +1082,7 @@ async function addOrUpdateEntry(event) {
     entries.push(candidate);
   }
 
-  entries = sortEntriesByDateDesc(entries);
+  entries = sortEntriesByDateDesc(entries.map(normalizeEntry));
   saveEntries();
   renderAll();
 
@@ -1048,12 +1159,16 @@ function exportCSV() {
     "PL2",
     "ActualReturn",
     "ActualPL",
+    "BestCaseOutcome",
+    "BestCasePL",
+    "WorstCaseOutcome",
+    "WorstCasePL",
     "Notes"
   ];
 
   const rows = [];
 
-  entries.forEach(entry => {
+  entries.map(normalizeEntry).forEach(entry => {
     (entry.bookmakers || []).forEach(bm => {
       if (bm.totalStake > 0 || bm.odd1 > 0 || bm.oddX > 0 || bm.odd2 > 0) {
         rows.push([
@@ -1084,6 +1199,10 @@ function exportCSV() {
           entry.pl2,
           entry.actualReturn,
           entry.actualPL,
+          entry.bestCase?.outcome || "",
+          entry.bestCase?.pl || 0,
+          entry.worstCase?.outcome || "",
+          entry.worstCase?.pl || 0,
           `"${(entry.notes || "").replace(/"/g, '""')}"`
         ]);
       }
