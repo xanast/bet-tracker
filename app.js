@@ -1,4 +1,5 @@
 const STORAGE_KEY = "bet_tracker_entries";
+const ACCOUNTS_STORAGE_KEY = "bet_tracker_accounts";
 
 const BOOKMAKERS = [
   "Stoiximan",
@@ -10,7 +11,10 @@ const BOOKMAKERS = [
   "Superbet"
 ];
 
+const DEFAULT_ACCOUNT_NAME = "Χωρίς λογαριασμό";
+
 let entries = [];
+let savedAccounts = [];
 let deferredPrompt = null;
 let currentEditId = null;
 let expandedEntryIds = new Set();
@@ -24,6 +28,8 @@ const sections = document.querySelectorAll(".page-section");
 const pageTitle = document.getElementById("pageTitle");
 
 const betForm = document.getElementById("betForm");
+const accountNameInput = document.getElementById("accountName");
+const accountsList = document.getElementById("accountsList");
 const matchDate = document.getElementById("matchDate");
 const sport = document.getElementById("sport");
 const market = document.getElementById("market");
@@ -36,6 +42,7 @@ const entryFormTitle = document.getElementById("entryFormTitle");
 const editBanner = document.getElementById("editBanner");
 const cancelEditBtn = document.getElementById("cancelEditBtn");
 const submitEntryBtn = document.getElementById("submitEntryBtn");
+const duplicateEntryBtn = document.getElementById("duplicateEntryBtn");
 
 const previewStake = document.getElementById("previewStake");
 const previewMargin = document.getElementById("previewMargin");
@@ -50,6 +57,7 @@ const previewPL = document.getElementById("previewPL");
 
 const historyTableBody = document.getElementById("historyTableBody");
 const recentEntries = document.getElementById("recentEntries");
+const accountSummaryGrid = document.getElementById("accountSummaryGrid");
 
 const totalMatches = document.getElementById("totalMatches");
 const totalStake = document.getElementById("totalStake");
@@ -58,6 +66,8 @@ const totalPL = document.getElementById("totalPL");
 const avgMargin = document.getElementById("avgMargin");
 const roiValue = document.getElementById("roiValue");
 
+const dashboardAccountFilter = document.getElementById("dashboardAccountFilter");
+const filterAccount = document.getElementById("filterAccount");
 const filterSport = document.getElementById("filterSport");
 const filterMarket = document.getElementById("filterMarket");
 const searchMatch = document.getElementById("searchMatch");
@@ -100,8 +110,77 @@ function parseNum(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function formatMargin(value) {
+  return value === null || value === undefined ? "N/A" : `${Number(value).toFixed(2)}%`;
+}
+
+function sanitizeAccountName(value) {
+  const cleaned = String(value || "").trim();
+  return cleaned || DEFAULT_ACCOUNT_NAME;
+}
+
 function saveEntries() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function saveAccounts() {
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(savedAccounts));
+}
+
+function loadAccounts() {
+  const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+  if (!raw) {
+    savedAccounts = [];
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    savedAccounts = Array.isArray(parsed)
+      ? [...new Set(parsed.map(sanitizeAccountName))].sort((a, b) => a.localeCompare(b, "el"))
+      : [];
+  } catch {
+    savedAccounts = [];
+  }
+}
+
+function extractAccountsFromEntries(list) {
+  return [...new Set(list.map((entry) => sanitizeAccountName(entry.accountName)))].sort((a, b) => a.localeCompare(b, "el"));
+}
+
+function mergeSavedAccounts() {
+  const merged = [...new Set([...savedAccounts, ...extractAccountsFromEntries(entries)])]
+    .map(sanitizeAccountName)
+    .sort((a, b) => a.localeCompare(b, "el"));
+
+  savedAccounts = merged;
+  saveAccounts();
+  renderAccountsUI();
+}
+
+function renderAccountsUI() {
+  if (accountsList) {
+    accountsList.innerHTML = savedAccounts
+      .map((name) => `<option value="${name}"></option>`)
+      .join("");
+  }
+
+  const options = [
+    `<option value="all">Όλοι οι λογαριασμοί</option>`,
+    ...savedAccounts.map((name) => `<option value="${name}">${name}</option>`)
+  ].join("");
+
+  if (dashboardAccountFilter) {
+    const current = dashboardAccountFilter.value || "all";
+    dashboardAccountFilter.innerHTML = options;
+    dashboardAccountFilter.value = savedAccounts.includes(current) || current === "all" ? current : "all";
+  }
+
+  if (filterAccount) {
+    const current = filterAccount.value || "all";
+    filterAccount.innerHTML = options;
+    filterAccount.value = savedAccounts.includes(current) || current === "all" ? current : "all";
+  }
 }
 
 function loadEntries() {
@@ -214,7 +293,7 @@ function createBookmakerCards() {
         </div>
         <div class="bookmaker-badges">
           <span class="bookmaker-badge">
-            Margin: <strong id="margin-${index}">0.00%</strong>
+            Margin: <strong id="margin-${index}">N/A</strong>
           </span>
           <span class="bookmaker-badge">
             Stake: <strong id="stake-total-${index}">€0.00</strong>
@@ -356,6 +435,7 @@ function computeAggregate(bookmakers, marketType, selectedResult) {
 function normalizeEntry(rawEntry) {
   const entry = {
     ...rawEntry,
+    accountName: sanitizeAccountName(rawEntry.accountName),
     bookmakers: Array.isArray(rawEntry.bookmakers) ? rawEntry.bookmakers : []
   };
 
@@ -428,10 +508,6 @@ function updateBookmakerCardVisuals() {
   });
 }
 
-function formatMargin(value) {
-  return value === null || value === undefined ? "N/A" : `${Number(value).toFixed(2)}%`;
-}
-
 function setValueClass(el, value) {
   if (!el) return;
   el.classList.remove("positive", "negative", "neutral");
@@ -496,6 +572,7 @@ function enterEditMode() {
 
 function resetForm() {
   if (betForm) betForm.reset();
+  if (accountNameInput) accountNameInput.value = "";
   if (matchDate) matchDate.value = new Date().toISOString().split("T")[0];
   if (sport) sport.value = "football";
   if (market) market.value = "1X2";
@@ -507,6 +584,7 @@ function resetForm() {
 }
 
 function populateFormFromEntry(entry) {
+  if (accountNameInput) accountNameInput.value = entry.accountName || "";
   if (matchDate) matchDate.value = entry.matchDate || "";
   if (sport) sport.value = entry.sport || "football";
   if (market) market.value = entry.market || "1X2";
@@ -540,17 +618,40 @@ function populateFormFromEntry(entry) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function duplicateCurrentEntry() {
+  if (!currentEditId) {
+    alert("Μπες πρώτα σε edit mode ή δημιούργησε νέο entry.");
+    return;
+  }
+
+  currentEditId = null;
+  if (entryFormTitle) entryFormTitle.textContent = "Νέο Duplicate Entry";
+  if (submitEntryBtn) submitEntryBtn.textContent = "Αποθήκευση";
+  if (editBanner) editBanner.classList.add("hidden");
+}
+
+function getDashboardFilteredEntries() {
+  const selectedAccount = dashboardAccountFilter?.value || "all";
+  const normalized = entries.map(normalizeEntry);
+
+  if (selectedAccount === "all") return sortEntriesByDateDesc(normalized);
+  return sortEntriesByDateDesc(normalized.filter((item) => item.accountName === selectedAccount));
+}
+
 function renderStats() {
   if (!totalMatches) return;
 
-  const normalizedEntries = entries.map(normalizeEntry);
-  const totalEntries = normalizedEntries.length;
-  const sumStake = normalizedEntries.reduce((acc, item) => acc + Number(item.totalStake || 0), 0);
-  const sumReturn = normalizedEntries.reduce((acc, item) => acc + Number(item.actualReturn || 0), 0);
-  const sumPL = normalizedEntries.reduce((acc, item) => acc + Number(item.actualPL || 0), 0);
-  const marginAverage = totalEntries
-    ? normalizedEntries.reduce((acc, item) => acc + Number(item.weightedMargin || 0), 0) / totalEntries
-    : 0;
+  const filtered = getDashboardFilteredEntries();
+  const totalEntries = filtered.length;
+  const sumStake = filtered.reduce((acc, item) => acc + Number(item.totalStake || 0), 0);
+  const sumReturn = filtered.reduce((acc, item) => acc + Number(item.actualReturn || 0), 0);
+  const sumPL = filtered.reduce((acc, item) => acc + Number(item.actualPL || 0), 0);
+
+  const validMargins = filtered.filter((item) => item.weightedMargin !== null && item.weightedMargin !== undefined);
+  const marginAverage = validMargins.length
+    ? validMargins.reduce((acc, item) => acc + Number(item.weightedMargin || 0), 0) / validMargins.length
+    : null;
+
   const roi = sumStake ? (sumPL / sumStake) * 100 : 0;
 
   totalMatches.textContent = totalEntries;
@@ -564,19 +665,79 @@ function renderStats() {
   setValueClass(roiValue, roi);
 }
 
+function renderAccountSummary() {
+  if (!accountSummaryGrid) return;
+
+  const normalized = entries.map(normalizeEntry);
+  if (!normalized.length) {
+    accountSummaryGrid.innerHTML = `<div class="empty-state">Δεν υπάρχουν ακόμα λογαριασμοί.</div>`;
+    return;
+  }
+
+  const grouped = {};
+  normalized.forEach((entry) => {
+    const key = entry.accountName;
+    if (!grouped[key]) {
+      grouped[key] = {
+        accountName: key,
+        matches: 0,
+        totalStake: 0,
+        totalPL: 0,
+        totalReturn: 0,
+        margins: []
+      };
+    }
+
+    grouped[key].matches += 1;
+    grouped[key].totalStake += Number(entry.totalStake || 0);
+    grouped[key].totalPL += Number(entry.actualPL || 0);
+    grouped[key].totalReturn += Number(entry.actualReturn || 0);
+    if (entry.weightedMargin !== null && entry.weightedMargin !== undefined) {
+      grouped[key].margins.push(Number(entry.weightedMargin));
+    }
+  });
+
+  const cards = Object.values(grouped)
+    .sort((a, b) => a.accountName.localeCompare(b.accountName, "el"))
+    .map((group) => {
+      const avg = group.margins.length
+        ? group.margins.reduce((sum, x) => sum + x, 0) / group.margins.length
+        : null;
+      const roi = group.totalStake ? (group.totalPL / group.totalStake) * 100 : 0;
+
+      return `
+        <div class="stat-card tilt-card">
+          <div class="stat-top">
+            <span>${group.accountName}</span>
+            <span class="stat-icon">👤</span>
+          </div>
+          <div style="display:grid;gap:8px;">
+            <div>Ματς: <strong>${group.matches}</strong></div>
+            <div>Stake: <strong>${formatCurrency(group.totalStake)}</strong></div>
+            <div>P/L: <strong class="${group.totalPL > 0 ? "positive" : group.totalPL < 0 ? "negative" : "neutral"}">${formatCurrency(group.totalPL)}</strong></div>
+            <div>ROI: <strong class="${roi > 0 ? "positive" : roi < 0 ? "negative" : "neutral"}">${formatPercent(roi)}</strong></div>
+            <div>Γκανιότα: <strong>${formatMargin(avg)}</strong></div>
+          </div>
+        </div>
+      `;
+    });
+
+  accountSummaryGrid.innerHTML = cards.join("");
+}
+
 function renderRecentEntries() {
   if (!recentEntries) return;
 
-  const normalizedEntries = sortEntriesByDateDesc(entries.map(normalizeEntry));
+  const filtered = getDashboardFilteredEntries();
 
-  if (!normalizedEntries.length) {
+  if (!filtered.length) {
     recentEntries.className = "recent-list empty-state";
     recentEntries.textContent = "Δεν υπάρχουν ακόμα καταχωρίσεις.";
     return;
   }
 
   recentEntries.className = "recent-list";
-  const recent = normalizedEntries.slice(0, 5);
+  const recent = filtered.slice(0, 5);
 
   recentEntries.innerHTML = recent.map(item => {
     const finalState = item.result
@@ -586,6 +747,7 @@ function renderRecentEntries() {
     return `
       <div class="recent-item">
         <h4>${item.matchName}</h4>
+        <p>👤 ${item.accountName}</p>
         <p>${item.matchDate} • ${getSportLabel(item.sport)} • ${item.market}</p>
         <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Γκανιότα: ${formatMargin(item.weightedMargin)}</p>
         <p>${finalState}</p>
@@ -595,19 +757,22 @@ function renderRecentEntries() {
 }
 
 function getFilteredEntries() {
+  const selectedAccount = filterAccount?.value || "all";
   const selectedSport = filterSport?.value || "all";
   const selectedMarket = filterMarket?.value || "all";
   const query = searchMatch?.value.trim().toLowerCase() || "";
 
   return sortEntriesByDateDesc(entries.map(normalizeEntry)).filter(item => {
+    const accountMatch = selectedAccount === "all" || item.accountName === selectedAccount;
     const sportMatch = selectedSport === "all" || item.sport === selectedSport;
     const marketMatch = selectedMarket === "all" || item.market === selectedMarket;
     const textMatch =
       !query ||
       item.matchName.toLowerCase().includes(query) ||
+      item.accountName.toLowerCase().includes(query) ||
       (item.notes || "").toLowerCase().includes(query);
 
-    return sportMatch && marketMatch && textMatch;
+    return accountMatch && sportMatch && marketMatch && textMatch;
   });
 }
 
@@ -626,6 +791,19 @@ function editEntry(id) {
 }
 
 window.editEntry = editEntry;
+
+function duplicateEntry(id) {
+  const entry = entries.map(normalizeEntry).find((item) => item.id === id);
+  if (!entry) return;
+
+  populateFormFromEntry(entry);
+  currentEditId = null;
+  if (entryFormTitle) entryFormTitle.textContent = "Duplicate Entry";
+  if (submitEntryBtn) submitEntryBtn.textContent = "Αποθήκευση";
+  if (editBanner) editBanner.classList.add("hidden");
+}
+
+window.duplicateEntry = duplicateEntry;
 
 function getSettledLabel(item) {
   if (!item.result) return "Δεν έχει λήξει / δεν έχει οριστεί αποτέλεσμα";
@@ -669,17 +847,19 @@ function getBookmakerDetailHtml(item) {
         <span>Γκανιότα ${formatMargin(item.weightedMargin)}</span>
       </div>
       <div class="history-detail-grid">
+        <div><label>Λογαριασμός</label><p>${item.accountName}</p></div>
+        <div><label>Stake</label><p>${formatCurrency(item.totalStake)}</p></div>
         <div><label>Best Case</label><p>${getOutcomeLabel(item.market, item.bestCase.outcome)} → ${formatCurrency(item.bestCase.pl)}</p></div>
         <div><label>Worst Case</label><p>${getOutcomeLabel(item.market, item.worstCase.outcome)} → ${formatCurrency(item.worstCase.pl)}</p></div>
         <div><label>Settlement</label><p>${getSettledLabel(item)}</p></div>
-        <div><label>Stake</label><p>${formatCurrency(item.totalStake)}</p></div>
+        <div><label>Bookmakers</label><p>${item.usedBookmakersCount}</p></div>
       </div>
     </div>
   `;
 
   return `
     <tr class="history-detail-row">
-      <td colspan="12">
+      <td colspan="13">
         <div class="history-detail-wrap">
           ${summary}
           ${rows || `<div class="empty-state">Δεν υπάρχουν bookmaker details.</div>`}
@@ -697,7 +877,7 @@ function renderHistory() {
   if (!filtered.length) {
     historyTableBody.innerHTML = `
       <tr>
-        <td colspan="12" class="empty-state">Δεν βρέθηκαν καταχωρίσεις.</td>
+        <td colspan="13" class="empty-state">Δεν βρέθηκαν καταχωρίσεις.</td>
       </tr>
     `;
     return;
@@ -715,6 +895,7 @@ function renderHistory() {
     html += `
       <tr>
         <td>${item.matchDate}</td>
+        <td>${item.accountName}</td>
         <td>${getSportLabel(item.sport)}</td>
         <td>
           <strong>${item.matchName}</strong>
@@ -739,6 +920,7 @@ function renderHistory() {
           <div class="row-actions">
             <button class="small-btn" onclick="toggleExpandEntry('${item.id}')">${isExpanded ? "Hide" : "Details"}</button>
             <button class="small-btn" onclick="editEntry('${item.id}')">Edit</button>
+            <button class="small-btn" onclick="duplicateEntry('${item.id}')">Duplicate</button>
             <button class="small-btn delete" onclick="deleteEntry('${item.id}')">Delete</button>
           </div>
         </td>
@@ -754,7 +936,9 @@ function renderHistory() {
 }
 
 function renderAll() {
+  renderAccountsUI();
   renderStats();
+  renderAccountSummary();
   renderRecentEntries();
   renderHistory();
 }
@@ -772,6 +956,7 @@ function buildEntryFromForm() {
 
   return normalizeEntry({
     id: currentEditId || crypto.randomUUID(),
+    accountName: sanitizeAccountName(accountNameInput?.value),
     matchDate: matchDate?.value || "",
     sport: sport?.value || "football",
     market: market?.value || "1X2",
@@ -855,7 +1040,7 @@ function dbRowToEntry(row) {
     result: row.result || "",
     notes: row.notes || "",
     totalStake: Number(row.total_stake || payload.totalStake || 0),
-    weightedMargin: Number(row.weighted_margin || payload.weightedMargin || 0),
+    weightedMargin: row.weighted_margin ?? payload.weightedMargin ?? null,
     actualReturn: Number(row.actual_return || payload.actualReturn || 0),
     actualPL: Number(row.actual_pl || payload.actualPL || 0),
     usedBookmakersCount: Number(row.used_bookmakers_count || payload.usedBookmakersCount || 0),
@@ -1024,6 +1209,7 @@ async function syncFromCloud() {
 
     entries = merged;
     saveEntries();
+    mergeSavedAccounts();
     renderAll();
 
     await pushAllLocalEntriesToCloud();
@@ -1031,6 +1217,7 @@ async function syncFromCloud() {
     const freshRemote = await fetchCloudEntries();
     entries = sortEntriesByDateDesc(freshRemote);
     saveEntries();
+    mergeSavedAccounts();
     renderAll();
 
     setAuthStatus(`Synced successfully. Logged in as ${currentUser.email || "user"}.`);
@@ -1075,6 +1262,11 @@ async function deleteEntryFromCloud(id) {
 async function addOrUpdateEntry(event) {
   event.preventDefault();
 
+  if (!accountNameInput?.value.trim()) {
+    alert("Συμπλήρωσε λογαριασμό.");
+    return;
+  }
+
   if (!matchName?.value.trim()) {
     alert("Συμπλήρωσε όνομα αγώνα.");
     return;
@@ -1095,6 +1287,7 @@ async function addOrUpdateEntry(event) {
   }
 
   entries = sortEntriesByDateDesc(entries.map(normalizeEntry));
+  mergeSavedAccounts();
   saveEntries();
   renderAll();
 
@@ -1123,6 +1316,7 @@ async function deleteEntry(id) {
   }
 
   saveEntries();
+  mergeSavedAccounts();
   renderAll();
 
   try {
@@ -1144,6 +1338,7 @@ function exportCSV() {
   }
 
   const headers = [
+    "Account",
     "Date",
     "Sport",
     "Match",
@@ -1184,6 +1379,7 @@ function exportCSV() {
     (entry.bookmakers || []).forEach(bm => {
       if (bm.totalStake > 0 || bm.odd1 > 0 || bm.oddX > 0 || bm.odd2 > 0) {
         rows.push([
+          `"${entry.accountName.replace(/"/g, '""')}"`,
           entry.matchDate,
           entry.sport,
           `"${entry.matchName.replace(/"/g, '""')}"`,
@@ -1197,12 +1393,12 @@ function exportCSV() {
           bm.stakeX,
           bm.stake2,
           bm.totalStake,
-          bm.margin,
+          bm.margin ?? "",
           bm.return1,
           bm.returnX,
           bm.return2,
           entry.totalStake,
-          entry.weightedMargin,
+          entry.weightedMargin ?? "",
           entry.totalReturn1,
           entry.totalReturnX,
           entry.totalReturn2,
@@ -1243,6 +1439,7 @@ async function clearAllEntries() {
   expandedEntryIds.clear();
   resetForm();
   saveEntries();
+  mergeSavedAccounts();
   renderAll();
 
   if (!currentUser || !supabaseClient || !ids.length) return;
@@ -1296,7 +1493,7 @@ function updateToolCalculator() {
   const o2 = parseNum(calcOdd2?.value);
 
   const margin = calculateMargin(marketType, o1, ox, o2);
-  toolMarginOutput.textContent = formatPercent(margin);
+  toolMarginOutput.textContent = formatMargin(margin);
 
   document.querySelectorAll(".calc-x-field").forEach(el => {
     el.style.display = marketType === "1X2" ? "flex" : "none";
@@ -1338,6 +1535,21 @@ if (resetFormBtn) {
 
 if (cancelEditBtn) {
   cancelEditBtn.addEventListener("click", resetForm);
+}
+
+if (duplicateEntryBtn) {
+  duplicateEntryBtn.addEventListener("click", duplicateCurrentEntry);
+}
+
+if (dashboardAccountFilter) {
+  dashboardAccountFilter.addEventListener("change", () => {
+    renderStats();
+    renderRecentEntries();
+  });
+}
+
+if (filterAccount) {
+  filterAccount.addEventListener("change", renderHistory);
 }
 
 if (filterSport) {
@@ -1434,7 +1646,9 @@ async function init() {
   try {
     createBookmakerCards();
     bindDynamicBookmakerInputs();
+    loadAccounts();
     loadEntries();
+    mergeSavedAccounts();
     resetForm();
     updateToolCalculator();
     renderAll();

@@ -55,79 +55,97 @@
       <div class="sidebar-card premium-card">
         <div class="sidebar-card-head">
           <h3>Quick Notes</h3>
-          <span class="mini-pill">Multi-bookmaker</span>
+          <span class="mini-pill">Multi-account</span>
         </div>
         <p>
-          Καταχώρισε ένα ματς, μοίρασε stakes σε πολλές στοιχηματικές,
-          κάνε edit αργότερα και κράτα πλήρες ιστορικό.
+          Καταχώρισε ματς ανά λογαριασμό, δες γκανιότα, ιστορικό,
+          account stats και full sync σε όλες τις συσκευές.
         </p>
       </div>
 
       <div class="sidebar-footer">
-        <div class="footer-chip">Stoiximan</div>
-        <div class="footer-chip">Novibet</div>
-        <div class="footer-chip">Bet365</div>
+        <div class="footer-chip">Accounts</div>
+        <div class="footer-chip">Cloud Sync</div>
+        <div class="footer-chip">ROI</div>
       </div>
     </aside>
 
     <main class="main-content">
       <header class="topbar">
-  <div class="topbar-left">
-    <div class="eyebrow">Bet Analytics Suite</div>
-    <h2 id="pageTitle">Dashboard</h2>
-    <p class="muted">
-      Παρακολούθηση αποδόσεων, πονταρισμάτων, bookmaker margin και καθαρού αποτελέσματος
-    </p>
-  </div>
+        <div class="topbar-left">
+          <div class="eyebrow">Bet Analytics Suite</div>
+          <h2 id="pageTitle">Dashboard</h2>
+          <p class="muted">
+            Παρακολούθηση αποδόσεων, πονταρισμάτων, γκανιότας και καθαρού αποτελέσματος
+          </p>
+        </div>
 
-  <div class="topbar-actions">
-    <button id="authToggleBtn" class="secondary-btn" type="button">Cloud Sync</button>
-    <button id="installBtn" class="secondary-btn hidden">Install App</button>
-    <button id="exportCsvBtn" class="primary-btn glow-btn">Export CSV</button>
-  </div>
-</header>
+        <div class="topbar-actions">
+          <button id="authToggleBtn" class="secondary-btn" type="button">Cloud Sync</button>
+          <button id="installBtn" class="secondary-btn hidden">Install App</button>
+          <button id="exportCsvBtn" class="primary-btn glow-btn">Export CSV</button>
+        </div>
+      </header>
 
-<div id="authPanel" class="auth-panel hidden">
-  <div class="auth-panel-head">
-    <div>
-      <span class="panel-kicker">Cloud Sync</span>
-      <h3>Supabase Sync</h3>
-    </div>
-    <button id="authCloseBtn" type="button" class="small-btn">Close</button>
-  </div>
+      <div id="authPanel" class="auth-panel hidden">
+        <div class="auth-panel-head">
+          <div>
+            <span class="panel-kicker">Cloud Sync</span>
+            <h3>Supabase Sync</h3>
+          </div>
+          <button id="authCloseBtn" type="button" class="small-btn">Close</button>
+        </div>
 
-  <div class="auth-panel-grid">
-    <div class="field">
-      <label for="authEmail">Email</label>
-      <input type="email" id="authEmail" placeholder="you@example.com" />
-    </div>
+        <div class="auth-panel-grid">
+          <div class="field">
+            <label for="authEmail">Email</label>
+            <input type="email" id="authEmail" placeholder="you@example.com" />
+          </div>
 
-    <div class="field">
-      <label for="authPassword">Password</label>
-      <input type="password" id="authPassword" placeholder="Password" />
-    </div>
-  </div>
+          <div class="field">
+            <label for="authPassword">Password</label>
+            <input type="password" id="authPassword" placeholder="Password" />
+          </div>
+        </div>
 
-  <div class="auth-panel-actions">
-    <button type="button" id="authLoginBtn" class="primary-btn">Login</button>
-    <button type="button" id="authSignupBtn" class="secondary-btn">Sign Up</button>
-    <button type="button" id="authLogoutBtn" class="secondary-btn">Logout</button>
-    <button type="button" id="authSyncBtn" class="secondary-btn">Sync Now</button>
-  </div>
+        <div class="auth-panel-actions">
+          <button type="button" id="authLoginBtn" class="primary-btn">Login</button>
+          <button type="button" id="authSignupBtn" class="secondary-btn">Sign Up</button>
+          <button type="button" id="authLogoutBtn" class="secondary-btn">Logout</button>
+          <button type="button" id="authSyncBtn" class="secondary-btn">Sync Now</button>
+        </div>
 
-  <div id="authStatusText" class="auth-status-text">
-    Local mode. Συνδέσου για sync σε κινητό και PC.
-  </div>
-</div>
+        <div id="authStatusText" class="auth-status-text">
+          Local mode. Συνδέσου για sync σε κινητό και PC.
+        </div>
+      </div>
 
       <section id="dashboard" class="page-section active">
+        <div class="dashboard-filters panel premium-card">
+          <div class="panel-head split" style="margin-bottom:14px;">
+            <div>
+              <span class="panel-kicker">Dashboard Filter</span>
+              <h3>Λογαριασμός</h3>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="dashboardAccountFilter">Προβολή για</label>
+              <select id="dashboardAccountFilter">
+                <option value="all">Όλοι οι λογαριασμοί</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div class="hero-panel">
           <div class="hero-copy">
             <div class="hero-badge">Premium Release UI</div>
             <h3>Track every match across multiple bookmakers.</h3>
             <p>
               Κατέγραφε διαφορετικές αποδόσεις και stakes ανά bookmaker,
-              δες weighted margin συνολικά και portfolio P/L ανά outcome.
+              δες γκανιότα συνολικά και portfolio P/L ανά outcome και ανά λογαριασμό.
             </p>
           </div>
 
@@ -172,7 +190,7 @@
 
           <div class="stat-card tilt-card">
             <div class="stat-top">
-              <span>Μέση Weighted Γκανιότα</span>
+              <span>Μέση Γκανιότα</span>
               <span class="stat-icon">%</span>
             </div>
             <strong id="avgMargin">0.00%</strong>
@@ -184,6 +202,18 @@
               <span class="stat-icon">△</span>
             </div>
             <strong id="roiValue">0.00%</strong>
+          </div>
+        </div>
+
+        <div class="panel premium-card" style="margin-bottom:18px;">
+          <div class="panel-head">
+            <div>
+              <span class="panel-kicker">Accounts</span>
+              <h3>Σύνοψη Λογαριασμών</h3>
+            </div>
+          </div>
+          <div id="accountSummaryGrid" class="account-summary-grid">
+            <div class="empty-state">Δεν υπάρχουν ακόμα λογαριασμοί.</div>
           </div>
         </div>
 
@@ -211,22 +241,22 @@
             <div class="summary-box">
               <div class="summary-row">
                 <span class="summary-dot cyan"></span>
-                <p>Margin ανά bookmaker με βάση τις αποδόσεις που περνάς σε κάθε εταιρεία.</p>
+                <p>Γκανιότα ανά bookmaker με βάση τις πλήρεις αποδόσεις που περνάς σε κάθε εταιρεία.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot green"></span>
-                <p>Weighted συνολική γκανιότα με βάση το stake που έπαιξες σε κάθε bookmaker.</p>
+                <p>Συνολική γκανιότα με βάση το stake που έπαιξες σε κάθε bookmaker.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot purple"></span>
-                <p>Search, edit και detailed history για να μην ξαναγράφεις entries από την αρχή.</p>
+                <p>Λογαριασμοί για Μιχάλη, Γιάννη, δικό σου account ή όποιον άλλο θες.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot orange"></span>
-                <p>CSV export για πλήρες αρχείο των ματς και των επιμέρους bookmakers.</p>
+                <p>CSV export και cloud sync για πλήρες αρχείο ανά λογαριασμό.</p>
               </div>
             </div>
           </div>
@@ -252,6 +282,12 @@
 
           <form id="betForm" class="bet-form">
             <div class="form-grid">
+              <div class="field">
+                <label for="accountName">Λογαριασμός</label>
+                <input type="text" id="accountName" list="accountsList" placeholder="πχ Μιχάλης" required />
+                <datalist id="accountsList"></datalist>
+              </div>
+
               <div class="field">
                 <label for="matchDate">Ημερομηνία</label>
                 <input type="date" id="matchDate" required />
@@ -290,7 +326,7 @@
 
               <div class="field full">
                 <label for="notes">Σημειώσεις</label>
-                <textarea id="notes" rows="4" placeholder="Notes, λογική, σκέψη πριν το bet, πληροφορίες αγώνα..."></textarea>
+                <textarea id="notes" rows="4" placeholder="Σημειώσεις για account, λογική, σκέψη, πληροφορίες αγώνα..."></textarea>
               </div>
             </div>
 
@@ -310,7 +346,7 @@
               </div>
 
               <div class="preview-card premium-mini-card">
-                <span>Weighted Γκανιότα</span>
+                <span>Γκανιότα</span>
                 <strong id="previewMargin">0.00%</strong>
               </div>
 
@@ -357,6 +393,7 @@
 
             <div class="form-actions">
               <button type="submit" id="submitEntryBtn" class="primary-btn glow-btn">Αποθήκευση</button>
+              <button type="button" id="duplicateEntryBtn" class="secondary-btn">Duplicate Entry</button>
               <button type="button" id="resetFormBtn" class="secondary-btn">Καθαρισμός</button>
             </div>
           </form>
@@ -377,6 +414,10 @@
               </div>
 
               <div class="filters history-filters">
+                <select id="filterAccount">
+                  <option value="all">Όλοι οι λογαριασμοί</option>
+                </select>
+
                 <select id="filterSport">
                   <option value="all">Όλα τα αθλήματα</option>
                   <option value="football">Ποδόσφαιρο</option>
@@ -398,6 +439,7 @@
                 <thead>
                   <tr>
                     <th>Ημ/νία</th>
+                    <th>Λογαριασμός</th>
                     <th>Άθλημα</th>
                     <th>Ματς</th>
                     <th>Market</th>
@@ -476,7 +518,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="app.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
