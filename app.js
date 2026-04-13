@@ -1,5 +1,6 @@
 const STORAGE_KEY = "bet_tracker_entries";
 const ACCOUNTS_STORAGE_KEY = "bet_tracker_accounts";
+const DEFAULT_ACCOUNT_NAME = "Χωρίς λογαριασμό";
 
 const BOOKMAKERS = [
   "Stoiximan",
@@ -11,10 +12,9 @@ const BOOKMAKERS = [
   "Superbet"
 ];
 
-const DEFAULT_ACCOUNT_NAME = "Χωρίς λογαριασμό";
-
 let entries = [];
 let savedAccounts = [];
+let selectedHistoryIds = new Set();
 let deferredPrompt = null;
 let currentEditId = null;
 let expandedEntryIds = new Set();
@@ -72,6 +72,14 @@ const filterSport = document.getElementById("filterSport");
 const filterMarket = document.getElementById("filterMarket");
 const searchMatch = document.getElementById("searchMatch");
 
+const selectAllHistory = document.getElementById("selectAllHistory");
+const bulkSelectedCount = document.getElementById("bulkSelectedCount");
+const bulkAssignAccountInput = document.getElementById("bulkAssignAccountInput");
+const bulkAssignBtn = document.getElementById("bulkAssignBtn");
+const bulkSettleResult = document.getElementById("bulkSettleResult");
+const bulkSettleBtn = document.getElementById("bulkSettleBtn");
+const exportFilteredBtn = document.getElementById("exportFilteredBtn");
+
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
 const resetFormBtn = document.getElementById("resetFormBtn");
@@ -119,6 +127,24 @@ function sanitizeAccountName(value) {
   return cleaned || DEFAULT_ACCOUNT_NAME;
 }
 
+function getStatusMeta(entry) {
+  if (!entry.result) {
+    return { label: "Εκκρεμεί", className: "status-pending" };
+  }
+  if (entry.actualPL > 0) {
+    return { label: "Κερδισμένο", className: "status-win" };
+  }
+  if (entry.actualPL < 0) {
+    return { label: "Χαμένο", className: "status-loss" };
+  }
+  return { label: "Breakeven", className: "status-neutral" };
+}
+
+function getStatusBadgeHtml(entry) {
+  const meta = getStatusMeta(entry);
+  return `<span class="mini-pill ${meta.className}">${meta.label}</span>`;
+}
+
 function saveEntries() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }
@@ -160,9 +186,7 @@ function mergeSavedAccounts() {
 
 function renderAccountsUI() {
   if (accountsList) {
-    accountsList.innerHTML = savedAccounts
-      .map((name) => `<option value="${name}"></option>`)
-      .join("");
+    accountsList.innerHTML = savedAccounts.map((name) => `<option value="${name}"></option>`).join("");
   }
 
   const options = [
@@ -231,7 +255,6 @@ function calculateMargin(marketType, o1, ox, o2) {
     if (!o1 || !ox || !o2) return null;
     return ((1 / o1) + (1 / ox) + (1 / o2) - 1) * 100;
   }
-
   if (!o1 || !o2) return null;
   return ((1 / o1) + (1 / o2) - 1) * 100;
 }
@@ -269,11 +292,7 @@ function updateAuthUI() {
 function toggleAuthPanel(forceOpen = null) {
   if (!authPanel) return;
 
-  const shouldOpen =
-    forceOpen === null
-      ? authPanel.classList.contains("hidden")
-      : forceOpen;
-
+  const shouldOpen = forceOpen === null ? authPanel.classList.contains("hidden") : forceOpen;
   authPanel.classList.toggle("hidden", !shouldOpen);
 
   if (authToggleBtn) {
@@ -376,15 +395,12 @@ function computeAggregate(bookmakers, marketType, selectedResult) {
     : 0;
   const totalReturn2 = bookmakers.reduce((sum, bm) => sum + Number(bm.return2 || 0), 0);
 
-  const bookmakersWithValidMargin = bookmakers.filter(
+  const validMarginBookmakers = bookmakers.filter(
     (bm) => bm.margin !== null && bm.margin !== undefined && Number(bm.totalStake || 0) > 0
   );
 
-  const weightedMargin = bookmakersWithValidMargin.length && totalStake
-    ? bookmakersWithValidMargin.reduce(
-        (sum, bm) => sum + (Number(bm.margin || 0) * Number(bm.totalStake || 0)),
-        0
-      ) / totalStake
+  const weightedMargin = validMarginBookmakers.length && totalStake
+    ? validMarginBookmakers.reduce((sum, bm) => sum + (Number(bm.margin || 0) * Number(bm.totalStake || 0)), 0) / totalStake
     : null;
 
   const pl1 = totalReturn1 - totalStake;
@@ -399,15 +415,8 @@ function computeAggregate(bookmakers, marketType, selectedResult) {
   const actualPL = selectedResult ? actualReturn - totalStake : 0;
 
   const candidates = marketType === "1X2"
-    ? [
-        { outcome: "1", pl: pl1 },
-        { outcome: "X", pl: plX },
-        { outcome: "2", pl: pl2 }
-      ]
-    : [
-        { outcome: "1", pl: pl1 },
-        { outcome: "2", pl: pl2 }
-      ];
+    ? [{ outcome: "1", pl: pl1 }, { outcome: "X", pl: plX }, { outcome: "2", pl: pl2 }]
+    : [{ outcome: "1", pl: pl1 }, { outcome: "2", pl: pl2 }];
 
   const bestCase = candidates.reduce((best, cur) => cur.pl > best.pl ? cur : best, candidates[0] || { outcome: "-", pl: 0 });
   const worstCase = candidates.reduce((worst, cur) => cur.pl < worst.pl ? cur : worst, candidates[0] || { outcome: "-", pl: 0 });
@@ -620,7 +629,7 @@ function populateFormFromEntry(entry) {
 
 function duplicateCurrentEntry() {
   if (!currentEditId) {
-    alert("Μπες πρώτα σε edit mode ή δημιούργησε νέο entry.");
+    alert("Μπες πρώτα σε edit mode ή χρησιμοποίησε Duplicate από το ιστορικό.");
     return;
   }
 
@@ -729,7 +738,6 @@ function renderRecentEntries() {
   if (!recentEntries) return;
 
   const filtered = getDashboardFilteredEntries();
-
   if (!filtered.length) {
     recentEntries.className = "recent-list empty-state";
     recentEntries.textContent = "Δεν υπάρχουν ακόμα καταχωρίσεις.";
@@ -747,7 +755,7 @@ function renderRecentEntries() {
     return `
       <div class="recent-item">
         <h4>${item.matchName}</h4>
-        <p>👤 ${item.accountName}</p>
+        <p>👤 ${item.accountName} • ${getStatusBadgeHtml(item)}</p>
         <p>${item.matchDate} • ${getSportLabel(item.sport)} • ${item.market}</p>
         <p>Bookmakers: ${item.usedBookmakersCount} | Stake: ${formatCurrency(item.totalStake)} | Γκανιότα: ${formatMargin(item.weightedMargin)}</p>
         <p>${finalState}</p>
@@ -776,6 +784,12 @@ function getFilteredEntries() {
   });
 }
 
+function updateBulkSelectedCount() {
+  if (bulkSelectedCount) {
+    bulkSelectedCount.textContent = `${selectedHistoryIds.size} selected`;
+  }
+}
+
 function toggleExpandEntry(id) {
   if (expandedEntryIds.has(id)) expandedEntryIds.delete(id);
   else expandedEntryIds.add(id);
@@ -795,7 +809,6 @@ window.editEntry = editEntry;
 function duplicateEntry(id) {
   const entry = entries.map(normalizeEntry).find((item) => item.id === id);
   if (!entry) return;
-
   populateFormFromEntry(entry);
   currentEditId = null;
   if (entryFormTitle) entryFormTitle.textContent = "Duplicate Entry";
@@ -804,6 +817,14 @@ function duplicateEntry(id) {
 }
 
 window.duplicateEntry = duplicateEntry;
+
+function toggleSelectEntry(id, checked) {
+  if (checked) selectedHistoryIds.add(id);
+  else selectedHistoryIds.delete(id);
+  updateBulkSelectedCount();
+}
+
+window.toggleSelectEntry = toggleSelectEntry;
 
 function getSettledLabel(item) {
   if (!item.result) return "Δεν έχει λήξει / δεν έχει οριστεί αποτέλεσμα";
@@ -848,18 +869,18 @@ function getBookmakerDetailHtml(item) {
       </div>
       <div class="history-detail-grid">
         <div><label>Λογαριασμός</label><p>${item.accountName}</p></div>
+        <div><label>Status</label><p>${getStatusMeta(item).label}</p></div>
         <div><label>Stake</label><p>${formatCurrency(item.totalStake)}</p></div>
         <div><label>Best Case</label><p>${getOutcomeLabel(item.market, item.bestCase.outcome)} → ${formatCurrency(item.bestCase.pl)}</p></div>
         <div><label>Worst Case</label><p>${getOutcomeLabel(item.market, item.worstCase.outcome)} → ${formatCurrency(item.worstCase.pl)}</p></div>
         <div><label>Settlement</label><p>${getSettledLabel(item)}</p></div>
-        <div><label>Bookmakers</label><p>${item.usedBookmakersCount}</p></div>
       </div>
     </div>
   `;
 
   return `
     <tr class="history-detail-row">
-      <td colspan="13">
+      <td colspan="15">
         <div class="history-detail-wrap">
           ${summary}
           ${rows || `<div class="empty-state">Δεν υπάρχουν bookmaker details.</div>`}
@@ -877,16 +898,23 @@ function renderHistory() {
   if (!filtered.length) {
     historyTableBody.innerHTML = `
       <tr>
-        <td colspan="13" class="empty-state">Δεν βρέθηκαν καταχωρίσεις.</td>
+        <td colspan="15" class="empty-state">Δεν βρέθηκαν καταχωρίσεις.</td>
       </tr>
     `;
+    updateBulkSelectedCount();
     return;
   }
+
+  const visibleIds = new Set(filtered.map((item) => item.id));
+  selectedHistoryIds.forEach((id) => {
+    if (!entries.find((x) => x.id === id)) selectedHistoryIds.delete(id);
+  });
 
   let html = "";
 
   filtered.forEach(item => {
     const isExpanded = expandedEntryIds.has(item.id);
+    const isSelected = selectedHistoryIds.has(item.id);
 
     const settledBadge = item.result
       ? `<div class="muted">${getSettledLabel(item)}</div>`
@@ -894,8 +922,12 @@ function renderHistory() {
 
     html += `
       <tr>
+        <td>
+          <input type="checkbox" ${isSelected ? "checked" : ""} onchange="toggleSelectEntry('${item.id}', this.checked)" />
+        </td>
         <td>${item.matchDate}</td>
         <td>${item.accountName}</td>
+        <td>${getStatusBadgeHtml(item)}</td>
         <td>${getSportLabel(item.sport)}</td>
         <td>
           <strong>${item.matchName}</strong>
@@ -933,6 +965,12 @@ function renderHistory() {
   });
 
   historyTableBody.innerHTML = html;
+
+  if (selectAllHistory) {
+    selectAllHistory.checked = filtered.length > 0 && filtered.every((item) => selectedHistoryIds.has(item.id));
+  }
+
+  updateBulkSelectedCount();
 }
 
 function renderAll() {
@@ -1103,10 +1141,7 @@ async function signUpWithEmail() {
 
   setAuthStatus("Creating account...");
 
-  const { error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
+  const { error } = await supabaseClient.auth.signUp({ email, password });
 
   if (error) {
     alert(error.message);
@@ -1133,10 +1168,7 @@ async function loginWithEmail() {
 
   setAuthStatus("Logging in...");
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
   if (error) {
     alert(error.message);
@@ -1151,13 +1183,11 @@ async function loginWithEmail() {
 
 async function logoutUser() {
   if (!supabaseClient) return;
-
   const { error } = await supabaseClient.auth.signOut();
   if (error) {
     alert(error.message);
     return;
   }
-
   currentUser = null;
   updateAuthUI();
 }
@@ -1166,7 +1196,6 @@ async function pushAllLocalEntriesToCloud() {
   if (!supabaseClient || !currentUser) return;
 
   const rows = entries.map((entry) => entryToDbRow(entry, currentUser.id));
-
   if (!rows.length) return;
 
   const { error } = await supabaseClient
@@ -1259,6 +1288,27 @@ async function deleteEntryFromCloud(id) {
   }
 }
 
+async function persistEntriesChanges(affectedEntries = null) {
+  saveEntries();
+  mergeSavedAccounts();
+  renderAll();
+
+  try {
+    if (currentUser) {
+      if (affectedEntries && affectedEntries.length) {
+        for (const entry of affectedEntries) {
+          await saveEntryToCloud(entry);
+        }
+        await syncFromCloud();
+      } else {
+        await syncFromCloud();
+      }
+    }
+  } catch {
+    alert("Οι αλλαγές σώθηκαν τοπικά, αλλά απέτυχε το cloud sync.");
+  }
+}
+
 async function addOrUpdateEntry(event) {
   event.preventDefault();
 
@@ -1287,18 +1337,7 @@ async function addOrUpdateEntry(event) {
   }
 
   entries = sortEntriesByDateDesc(entries.map(normalizeEntry));
-  mergeSavedAccounts();
-  saveEntries();
-  renderAll();
-
-  try {
-    if (currentUser) {
-      await saveEntryToCloud(candidate);
-      await syncFromCloud();
-    }
-  } catch {
-    alert("Η καταχώριση σώθηκε τοπικά, αλλά απέτυχε το cloud sync.");
-  }
+  await persistEntriesChanges([candidate]);
 
   resetForm();
   switchSection("history");
@@ -1310,6 +1349,7 @@ async function deleteEntry(id) {
 
   entries = entries.filter(item => item.id !== id);
   expandedEntryIds.delete(id);
+  selectedHistoryIds.delete(id);
 
   if (currentEditId === id) {
     resetForm();
@@ -1331,17 +1371,13 @@ async function deleteEntry(id) {
 
 window.deleteEntry = deleteEntry;
 
-function exportCSV() {
-  if (!entries.length) {
-    alert("Δεν υπάρχουν δεδομένα για export.");
-    return;
-  }
-
+function buildCsvFromEntries(list) {
   const headers = [
     "Account",
     "Date",
     "Sport",
     "Match",
+    "Status",
     "Market",
     "Result",
     "Bookmaker",
@@ -1358,24 +1394,18 @@ function exportCSV() {
     "Return2",
     "MatchTotalStake",
     "MatchWeightedMargin",
-    "MatchReturn1",
-    "MatchReturnX",
-    "MatchReturn2",
     "PL1",
     "PLX",
     "PL2",
     "ActualReturn",
     "ActualPL",
-    "BestCaseOutcome",
-    "BestCasePL",
-    "WorstCaseOutcome",
-    "WorstCasePL",
     "Notes"
   ];
 
   const rows = [];
 
-  entries.map(normalizeEntry).forEach(entry => {
+  list.map(normalizeEntry).forEach(entry => {
+    const status = getStatusMeta(entry).label;
     (entry.bookmakers || []).forEach(bm => {
       if (bm.totalStake > 0 || bm.odd1 > 0 || bm.oddX > 0 || bm.odd2 > 0) {
         rows.push([
@@ -1383,6 +1413,7 @@ function exportCSV() {
           entry.matchDate,
           entry.sport,
           `"${entry.matchName.replace(/"/g, '""')}"`,
+          status,
           entry.market,
           entry.result,
           bm.name,
@@ -1399,34 +1430,47 @@ function exportCSV() {
           bm.return2,
           entry.totalStake,
           entry.weightedMargin ?? "",
-          entry.totalReturn1,
-          entry.totalReturnX,
-          entry.totalReturn2,
           entry.pl1,
           entry.plX,
           entry.pl2,
           entry.actualReturn,
           entry.actualPL,
-          entry.bestCase?.outcome || "",
-          entry.bestCase?.pl || 0,
-          entry.worstCase?.outcome || "",
-          entry.worstCase?.pl || 0,
           `"${(entry.notes || "").replace(/"/g, '""')}"`
         ]);
       }
     });
   });
 
-  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  return [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+}
+
+function downloadCsv(csv, filename) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = "bet-tracker-export.csv";
+  link.download = filename;
   link.click();
 
   URL.revokeObjectURL(url);
+}
+
+function exportCSV() {
+  if (!entries.length) {
+    alert("Δεν υπάρχουν δεδομένα για export.");
+    return;
+  }
+  downloadCsv(buildCsvFromEntries(entries), "bet-tracker-export.csv");
+}
+
+function exportFilteredCSV() {
+  const filtered = getFilteredEntries();
+  if (!filtered.length) {
+    alert("Δεν υπάρχουν filtered δεδομένα για export.");
+    return;
+  }
+  downloadCsv(buildCsvFromEntries(filtered), "bet-tracker-filtered-export.csv");
 }
 
 async function clearAllEntries() {
@@ -1437,6 +1481,7 @@ async function clearAllEntries() {
 
   entries = [];
   expandedEntryIds.clear();
+  selectedHistoryIds.clear();
   resetForm();
   saveEntries();
   mergeSavedAccounts();
@@ -1461,6 +1506,56 @@ async function clearAllEntries() {
   } catch {
     alert("Το local clear έγινε, αλλά το cloud clear απέτυχε.");
   }
+}
+
+async function applyBulkAssign() {
+  const account = sanitizeAccountName(bulkAssignAccountInput?.value);
+  if (!selectedHistoryIds.size) {
+    alert("Διάλεξε πρώτα entries.");
+    return;
+  }
+
+  const changed = [];
+  entries = entries.map((entry) => {
+    if (!selectedHistoryIds.has(entry.id)) return entry;
+    const updated = normalizeEntry({
+      ...entry,
+      accountName: account,
+      updatedAt: new Date().toISOString()
+    });
+    changed.push(updated);
+    return updated;
+  });
+
+  bulkAssignAccountInput.value = "";
+  await persistEntriesChanges(changed);
+}
+
+async function applyBulkSettle() {
+  const settleValue = bulkSettleResult?.value || "";
+  if (!selectedHistoryIds.size) {
+    alert("Διάλεξε πρώτα entries.");
+    return;
+  }
+  if (!settleValue) {
+    alert("Επίλεξε αποτέλεσμα settle.");
+    return;
+  }
+
+  const changed = [];
+  entries = entries.map((entry) => {
+    if (!selectedHistoryIds.has(entry.id)) return entry;
+    const updated = normalizeEntry({
+      ...entry,
+      result: settleValue === "clear" ? "" : settleValue,
+      updatedAt: new Date().toISOString()
+    });
+    changed.push(updated);
+    return updated;
+  });
+
+  bulkSettleResult.value = "";
+  await persistEntriesChanges(changed);
 }
 
 function switchSection(sectionId) {
@@ -1517,29 +1612,12 @@ navButtons.forEach((btn) => {
   });
 });
 
-if (market) {
-  market.addEventListener("change", updatePreview);
-}
-
-if (result) {
-  result.addEventListener("change", updatePreview);
-}
-
-if (betForm) {
-  betForm.addEventListener("submit", addOrUpdateEntry);
-}
-
-if (resetFormBtn) {
-  resetFormBtn.addEventListener("click", resetForm);
-}
-
-if (cancelEditBtn) {
-  cancelEditBtn.addEventListener("click", resetForm);
-}
-
-if (duplicateEntryBtn) {
-  duplicateEntryBtn.addEventListener("click", duplicateCurrentEntry);
-}
+if (market) market.addEventListener("change", updatePreview);
+if (result) result.addEventListener("change", updatePreview);
+if (betForm) betForm.addEventListener("submit", addOrUpdateEntry);
+if (resetFormBtn) resetFormBtn.addEventListener("click", resetForm);
+if (cancelEditBtn) cancelEditBtn.addEventListener("click", resetForm);
+if (duplicateEntryBtn) duplicateEntryBtn.addEventListener("click", duplicateCurrentEntry);
 
 if (dashboardAccountFilter) {
   dashboardAccountFilter.addEventListener("change", () => {
@@ -1548,28 +1626,28 @@ if (dashboardAccountFilter) {
   });
 }
 
-if (filterAccount) {
-  filterAccount.addEventListener("change", renderHistory);
-}
+if (filterAccount) filterAccount.addEventListener("change", renderHistory);
+if (filterSport) filterSport.addEventListener("change", renderHistory);
+if (filterMarket) filterMarket.addEventListener("change", renderHistory);
+if (searchMatch) searchMatch.addEventListener("input", renderHistory);
 
-if (filterSport) {
-  filterSport.addEventListener("change", renderHistory);
-}
+if (exportCsvBtn) exportCsvBtn.addEventListener("click", exportCSV);
+if (exportFilteredBtn) exportFilteredBtn.addEventListener("click", exportFilteredCSV);
+if (clearAllBtn) clearAllBtn.addEventListener("click", clearAllEntries);
 
-if (filterMarket) {
-  filterMarket.addEventListener("change", renderHistory);
-}
+if (bulkAssignBtn) bulkAssignBtn.addEventListener("click", applyBulkAssign);
+if (bulkSettleBtn) bulkSettleBtn.addEventListener("click", applyBulkSettle);
 
-if (searchMatch) {
-  searchMatch.addEventListener("input", renderHistory);
-}
-
-if (exportCsvBtn) {
-  exportCsvBtn.addEventListener("click", exportCSV);
-}
-
-if (clearAllBtn) {
-  clearAllBtn.addEventListener("click", clearAllEntries);
+if (selectAllHistory) {
+  selectAllHistory.addEventListener("change", (e) => {
+    const filtered = getFilteredEntries();
+    if (e.target.checked) {
+      filtered.forEach((item) => selectedHistoryIds.add(item.id));
+    } else {
+      filtered.forEach((item) => selectedHistoryIds.delete(item.id));
+    }
+    renderHistory();
+  });
 }
 
 [calcMarket, calcOdd1, calcOddX, calcOdd2].forEach((el) => {
@@ -1578,29 +1656,11 @@ if (clearAllBtn) {
   el.addEventListener("change", updateToolCalculator);
 });
 
-if (goNewEntryBtn) {
-  goNewEntryBtn.addEventListener("click", () => {
-    switchSection("new-entry");
-  });
-}
+if (goNewEntryBtn) goNewEntryBtn.addEventListener("click", () => switchSection("new-entry"));
+if (goHistoryBtn) goHistoryBtn.addEventListener("click", () => switchSection("history"));
 
-if (goHistoryBtn) {
-  goHistoryBtn.addEventListener("click", () => {
-    switchSection("history");
-  });
-}
-
-if (authToggleBtn) {
-  authToggleBtn.addEventListener("click", () => {
-    toggleAuthPanel();
-  });
-}
-
-if (authCloseBtn) {
-  authCloseBtn.addEventListener("click", () => {
-    toggleAuthPanel(false);
-  });
-}
+if (authToggleBtn) authToggleBtn.addEventListener("click", () => toggleAuthPanel());
+if (authCloseBtn) authCloseBtn.addEventListener("click", () => toggleAuthPanel(false));
 
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
@@ -1619,18 +1679,9 @@ if (installBtn) {
 }
 
 function initAuthActions() {
-  if (authLoginBtn) {
-    authLoginBtn.addEventListener("click", loginWithEmail);
-  }
-
-  if (authSignupBtn) {
-    authSignupBtn.addEventListener("click", signUpWithEmail);
-  }
-
-  if (authLogoutBtn) {
-    authLogoutBtn.addEventListener("click", logoutUser);
-  }
-
+  if (authLoginBtn) authLoginBtn.addEventListener("click", loginWithEmail);
+  if (authSignupBtn) authSignupBtn.addEventListener("click", signUpWithEmail);
+  if (authLogoutBtn) authLogoutBtn.addEventListener("click", logoutUser);
   if (authSyncBtn) {
     authSyncBtn.addEventListener("click", async () => {
       if (!currentUser) {

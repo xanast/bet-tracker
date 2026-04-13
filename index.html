@@ -58,14 +58,14 @@
           <span class="mini-pill">Multi-account</span>
         </div>
         <p>
-          Καταχώρισε ματς ανά λογαριασμό, δες γκανιότα, ιστορικό,
-          account stats και full sync σε όλες τις συσκευές.
+          Καταχώρισε ματς ανά λογαριασμό, δες γκανιότα,
+          account stats, ιστορικό, settle και full sync σε όλες τις συσκευές.
         </p>
       </div>
 
       <div class="sidebar-footer">
         <div class="footer-chip">Accounts</div>
-        <div class="footer-chip">Cloud Sync</div>
+        <div class="footer-chip">Settle</div>
         <div class="footer-chip">ROI</div>
       </div>
     </aside>
@@ -121,6 +121,22 @@
       </div>
 
       <section id="dashboard" class="page-section active">
+        <div class="hero-panel">
+          <div class="hero-copy">
+            <div class="hero-badge">Premium Release UI</div>
+            <h3>Track every match across multiple bookmakers.</h3>
+            <p>
+              Κατέγραφε διαφορετικές αποδόσεις και stakes ανά bookmaker,
+              δες γκανιότα συνολικά και portfolio P/L ανά outcome και ανά λογαριασμό.
+            </p>
+          </div>
+
+          <div class="hero-actions">
+            <button class="primary-btn" type="button" id="goNewEntryBtn">New Entry</button>
+            <button class="secondary-btn" type="button" id="goHistoryBtn">View History</button>
+          </div>
+        </div>
+
         <div class="dashboard-filters panel premium-card">
           <div class="panel-head split" style="margin-bottom:14px;">
             <div>
@@ -136,22 +152,6 @@
                 <option value="all">Όλοι οι λογαριασμοί</option>
               </select>
             </div>
-          </div>
-        </div>
-
-        <div class="hero-panel">
-          <div class="hero-copy">
-            <div class="hero-badge">Premium Release UI</div>
-            <h3>Track every match across multiple bookmakers.</h3>
-            <p>
-              Κατέγραφε διαφορετικές αποδόσεις και stakes ανά bookmaker,
-              δες γκανιότα συνολικά και portfolio P/L ανά outcome και ανά λογαριασμό.
-            </p>
-          </div>
-
-          <div class="hero-actions">
-            <button class="primary-btn" type="button" id="goNewEntryBtn">New Entry</button>
-            <button class="secondary-btn" type="button" id="goHistoryBtn">View History</button>
           </div>
         </div>
 
@@ -193,7 +193,7 @@
               <span>Μέση Γκανιότα</span>
               <span class="stat-icon">%</span>
             </div>
-            <strong id="avgMargin">0.00%</strong>
+            <strong id="avgMargin">N/A</strong>
           </div>
 
           <div class="stat-card tilt-card">
@@ -241,22 +241,22 @@
             <div class="summary-box">
               <div class="summary-row">
                 <span class="summary-dot cyan"></span>
-                <p>Γκανιότα ανά bookmaker με βάση τις πλήρεις αποδόσεις που περνάς σε κάθε εταιρεία.</p>
+                <p>Γκανιότα ανά bookmaker μόνο όταν υπάρχουν πλήρεις αποδόσεις για όλο το market.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot green"></span>
-                <p>Συνολική γκανιότα με βάση το stake που έπαιξες σε κάθε bookmaker.</p>
+                <p>Κάθε match μπορεί να ανήκει σε συγκεκριμένο λογαριασμό όπως Μιχάλης, Γιάννης ή δικό σου.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot purple"></span>
-                <p>Λογαριασμοί για Μιχάλη, Γιάννη, δικό σου account ή όποιον άλλο θες.</p>
+                <p>Μπορείς να κάνεις bulk assign λογαριασμού και bulk settle αποτελέσματος.</p>
               </div>
 
               <div class="summary-row">
                 <span class="summary-dot orange"></span>
-                <p>CSV export και cloud sync για πλήρες αρχείο ανά λογαριασμό.</p>
+                <p>CSV export για όλο το αρχείο ή μόνο για το τρέχον filtered history.</p>
               </div>
             </div>
           </div>
@@ -317,7 +317,7 @@
               <div class="field">
                 <label for="result">Αποτέλεσμα</label>
                 <select id="result">
-                  <option value="">Δεν έχει κριθεί ακόμα</option>
+                  <option value="">Εκκρεμεί</option>
                   <option value="1">1</option>
                   <option value="X">X</option>
                   <option value="2">2</option>
@@ -326,7 +326,7 @@
 
               <div class="field full">
                 <label for="notes">Σημειώσεις</label>
-                <textarea id="notes" rows="4" placeholder="Σημειώσεις για account, λογική, σκέψη, πληροφορίες αγώνα..."></textarea>
+                <textarea id="notes" rows="4" placeholder="Σημειώσεις για λογική, άτομο, πληροφορίες αγώνα..."></textarea>
               </div>
             </div>
 
@@ -347,7 +347,7 @@
 
               <div class="preview-card premium-mini-card">
                 <span>Γκανιότα</span>
-                <strong id="previewMargin">0.00%</strong>
+                <strong id="previewMargin">N/A</strong>
               </div>
 
               <div class="preview-card premium-mini-card">
@@ -387,7 +387,7 @@
 
               <div class="preview-card premium-mini-card">
                 <span>Actual P/L</span>
-                <strong id="previewPL">€0.00</strong>
+                <strong id="previewPL">—</strong>
               </div>
             </div>
 
@@ -407,29 +407,55 @@
               <span class="panel-kicker">Full Archive</span>
               <h3>Ιστορικό Αγώνων</h3>
             </div>
+          </div>
 
-            <div class="history-controls">
-              <div class="history-search">
-                <input type="text" id="searchMatch" placeholder="Search by match..." />
-              </div>
+          <div class="history-controls">
+            <div class="history-search">
+              <input type="text" id="searchMatch" placeholder="Search by match, λογαριασμό ή note..." />
+            </div>
 
-              <div class="filters history-filters">
-                <select id="filterAccount">
-                  <option value="all">Όλοι οι λογαριασμοί</option>
-                </select>
+            <div class="filters history-filters">
+              <select id="filterAccount">
+                <option value="all">Όλοι οι λογαριασμοί</option>
+              </select>
 
-                <select id="filterSport">
-                  <option value="all">Όλα τα αθλήματα</option>
-                  <option value="football">Ποδόσφαιρο</option>
-                  <option value="basketball">Μπάσκετ</option>
-                </select>
+              <select id="filterSport">
+                <option value="all">Όλα τα αθλήματα</option>
+                <option value="football">Ποδόσφαιρο</option>
+                <option value="basketball">Μπάσκετ</option>
+              </select>
 
-                <select id="filterMarket">
-                  <option value="all">Όλα τα markets</option>
-                  <option value="1X2">1X2</option>
-                  <option value="1-2">1-2</option>
-                </select>
-              </div>
+              <select id="filterMarket">
+                <option value="all">Όλα τα markets</option>
+                <option value="1X2">1X2</option>
+                <option value="1-2">1-2</option>
+              </select>
+
+              <button id="exportFilteredBtn" type="button" class="secondary-btn">Export Filtered</button>
+            </div>
+          </div>
+
+          <div class="bulk-actions-bar premium-card">
+            <div class="bulk-left">
+              <label class="bulk-select-all">
+                <input type="checkbox" id="selectAllHistory" />
+                <span>Επιλογή όλων των visible</span>
+              </label>
+              <span id="bulkSelectedCount" class="mini-pill">0 selected</span>
+            </div>
+
+            <div class="bulk-right">
+              <input type="text" id="bulkAssignAccountInput" list="accountsList" placeholder="Assign λογαριασμού" />
+              <button id="bulkAssignBtn" type="button" class="secondary-btn">Assign</button>
+
+              <select id="bulkSettleResult">
+                <option value="">Settle result</option>
+                <option value="1">1</option>
+                <option value="X">X</option>
+                <option value="2">2</option>
+                <option value="clear">Εκκρεμεί</option>
+              </select>
+              <button id="bulkSettleBtn" type="button" class="secondary-btn">Settle</button>
             </div>
           </div>
 
@@ -438,8 +464,10 @@
               <table>
                 <thead>
                   <tr>
+                    <th>Select</th>
                     <th>Ημ/νία</th>
                     <th>Λογαριασμός</th>
+                    <th>Status</th>
                     <th>Άθλημα</th>
                     <th>Ματς</th>
                     <th>Market</th>
@@ -497,7 +525,7 @@
 
             <div class="tool-output premium-output">
               <span>Γκανιότα</span>
-              <strong id="toolMarginOutput">0.00%</strong>
+              <strong id="toolMarginOutput">N/A</strong>
             </div>
           </div>
 
